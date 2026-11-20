@@ -2,6 +2,23 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Draft-only Stat presets for common jobs, character-specific jobs, or both, with four quick choices, a custom stat selection and a reset for all job rules.
+- The Reinkarnasi tab applies saved Stat Tuning rules to current and level-1 stats before equipment and shows a note when tuning contributes. Job 0xA1 keeps its feed values because its effective row is unknown.
+
+### Verified
+
+- 232 Party tests and 34 Core tests passed. The Release Control Center build completed with zero warnings and errors. The new tests cover job groups, per-job defaults, neutral columns, rounding and clamping, zero bytes, preservation of other rules, invalid inputs, both roster stat blocks and feed fallbacks.
+- Ran the Release Control Center in WebView2 with the real 134-job catalog. Exercised all four quick presets, custom HP-only tuning, all three scopes, input bounds, reset, discard, tab switching and an explicit save. Checked that a concurrent manual edit survived both preset calculation and saving, and that discarding a pending preset prevented a late reply from restoring it.
+- Inspected screenshots of the preset card and populated Squire editor at the default window size. The card fit its viewport without horizontal overflow. The app was closed and the test rules file removed, restoring its initial absence.
+
+### Not verified
+
+- The new preview and its note with a live roster, and the preset results in-game. Roster calculations were checked against test records. The game was not launched and no save file was touched.
+
 ## [0.5.0] - 2026-11-21
 
 ### Added

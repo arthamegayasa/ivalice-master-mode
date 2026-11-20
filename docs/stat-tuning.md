@@ -21,6 +21,14 @@ Raw stats live in the save; growth and multipliers do not. So a growth rule leav
 
 "The player's" means the unit's team bits (battle unit `+0x05`, mask `0x30`) are zero. A character rule also needs the unit's roster slot (`+0x02`) to hold a record with the same character marker; the rule is found by the same fingerprint the Reinkarnasi tab uses (character marker, sex, birthday, name key).
 
+## Presets in the Stat tab
+
+Choose **Job umum** (IDs 0x4A through 0x5D), **Job khusus karakter** (IDs below 0x4A), or both. Quick presets apply to the selected group in one click. The two growth buttons set speed to 125% or 150% for all stats. **HP dan MP +20%** sets the two multipliers to 120%, and **Semua stat +10%** sets all multipliers to 110%.
+
+For a custom preset, select the stats, enter growth speed and multiplier percentages from 25 to 400, then press **Terapkan ke draf**. Each job starts from its own catalog values. For example, 125% speed changes Squire HP growth from 11 to 9. The actual gain still depends on level. A percentage of 100 keeps the existing draft column. Other percentages replace the selected column, rounding to the nearest integer and clamping to 1 through 255. A zero game byte or a result equal to the game value leaves that entry empty. Applying a preset twice gives the same result.
+
+Scaling skips monster jobs. **Kembalikan semua job ke bawaan** clears every job rule, including manually edited monster rules. Both operations preserve character rules and the enemy switch. **Simpan** writes the draft. **Batalkan perubahan** restores the last saved rules.
+
 ## How it works
 
 The game does not read the job table when it computes a unit's stats or levels it up in battle. It copies the ten bytes from the job's row (`+0x0E` of a `0x31`-byte row) into the unit record at `+0x8A` when the unit is built, and works from that copy:
@@ -87,7 +95,7 @@ An independent review (GPT 6.2 Astra) found no fault in the hook stub, the stack
 - Job `0xA1` and the row it switches to at job level 8 (`0xA4`) have no name in the job list and appear as "Job tanpa nama". The "Hasil di job sekarang" column uses the character's job id, so for that one job it does not follow the switch.
 - The game has a second level-up routine that works on a roster record and reads the job table directly (`0x278B24`, called from `0x289F19`). The mod does not cover it. What triggers it was not determined; level-ups earned in battle do not go through it.
 - A battle in progress is not changed by new rules, and neither is a unit that was built before the rules were saved.
-- The Reinkarnasi tab computes its stat preview from the game's own job values, so it does not reflect Stat Tuning.
+- With Stat Tuning installed and enabled, the Reinkarnasi tab uses the saved job and character rules for current stats and the level-1 preview, before equipment. The feed supplies the raw stats for each separately. A missing catalog or unknown job leaves the feed values intact. Job `0xA1` also keeps the feed values because the feed omits the job level needed to distinguish rows `0xA1` and `0xA4`.
 - Speed, PA and MA are small whole numbers, so a modest multiplier change may not move them.
 - Characters are matched by fingerprint. Two generic units with the same sex, birthday and name key would share a rule.
 - Tuning is not balance-checked: high multipliers make the game trivially easy, and raw stats raised through a faster growth stay in the save after the rule is removed.

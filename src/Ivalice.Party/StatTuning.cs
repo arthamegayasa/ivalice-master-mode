@@ -83,15 +83,18 @@ public sealed class StatTuningRules
                 {
                     // The game treats a growth of 0 as 1.
                     var growth = Math.Max(1, (int)pairs[stat * 2]);
-                    changed |= Set(pairs, stat * 2, Scale(growth * 100, character.GrowthPercent[stat]));
+                    changed |= Set(pairs, stat * 2, ScaleGrowth(growth, character.GrowthPercent[stat]));
                 }
                 if (character.MultiplierPercent[stat] != 100)
-                    changed |= Set(pairs, stat * 2 + 1, Scale(pairs[stat * 2 + 1] * character.MultiplierPercent[stat], 100));
+                    changed |= Set(pairs, stat * 2 + 1, ScaleMultiplier(pairs[stat * 2 + 1], character.MultiplierPercent[stat]));
             }
         }
 
         return changed;
     }
+
+    internal static int ScaleGrowth(int value, int percent) => Scale(value * 100, percent);
+    internal static int ScaleMultiplier(int value, int percent) => Scale(value * percent, 100);
 
     private static int Scale(int numerator, int denominator) =>
         Math.Clamp((numerator + denominator / 2) / denominator, MinByte, MaxByte);
@@ -174,7 +177,7 @@ public sealed class StatTuningRules
 
     private static int[] Percents(JsonElement entry, string property)
     {
-        var values = new[] { 100, 100, 100, 100, 100 };
+        var values = Enumerable.Repeat(100, StatBlock.Count).ToArray();
         if (!entry.TryGetProperty(property, out var list) || list.ValueKind != JsonValueKind.Array) return values;
         var index = 0;
         foreach (var item in list.EnumerateArray())

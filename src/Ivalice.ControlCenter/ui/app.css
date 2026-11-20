@@ -224,6 +224,17 @@ details .settings { border-top: 0; background: none; padding-top: 2px; }
 .stat-input:focus-visible, .stat-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
 .stat-check { display: flex; gap: 10px; align-items: flex-start; }
 .stat-check input { margin-top: 3px; accent-color: var(--gold); }
+.preset-scope, .preset-values label, .preset-quick, .preset-values, .preset-checks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.preset-scope, .preset-form { font-size: 13px; }
+.preset-scope .stat-select { width: auto; }
+.preset-quick { margin: 10px 0 12px; }
+.preset-form { border-top: 1px solid var(--line); padding-top: 9px; }
+.preset-form fieldset { margin: 0 0 10px; padding: 0; border: 0; }
+.preset-form legend { float: left; padding: 0 12px 0 0; font-weight: 600; }
+.preset-checks, .preset-values { column-gap: 16px; }
+.preset-checks label { gap: 4px; }
+.preset-values label { gap: 6px; }
+.preset-form .stat-help { margin: 5px 0 0; }
 .stat-summary { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; user-select: text; }
 .stat-summary li { margin: 3px 0; }
 .reinc-foot { margin: 14px 0 0; color: var(--muted); font-size: 12.5px; user-select: text; }

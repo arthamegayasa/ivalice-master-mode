@@ -17,8 +17,9 @@ const STAT_STATUS = {
   modDisabled: ["warning", "Mod Stat Tuning sedang nonaktif. Aturan di sini tidak dipakai game sampai mod diaktifkan di tab Mod."],
 };
 
-const blankJob = () => ({ growth: [null, null, null, null, null], multiplier: [null, null, null, null, null] });
-const blankCharacter = (name) => ({ name: name || null, growthPercent: [100, 100, 100, 100, 100], multiplierPercent: [100, 100, 100, 100, 100] });
+const statValues = (value) => STAT_NAMES.map(() => value);
+const blankJob = () => ({ growth: statValues(null), multiplier: statValues(null) });
+const blankCharacter = (name) => ({ name: name || null, growthPercent: statValues(100), multiplierPercent: statValues(100) });
 const jobChanged = (rule) => !!rule && [...rule.growth, ...rule.multiplier].some((v) => v !== null);
 const characterChanged = (rule) => !!rule && [...rule.growthPercent, ...rule.multiplierPercent].some((v) => v !== 100);
 const clampNumber = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -103,7 +104,9 @@ function characterChoices() {
 
 function updateStatButtons() {
   const dirty = statDirty();
-  $("stat-save").disabled = !dirty || !!(stat && stat.rulesBusy);
+  $("stat-save").disabled = !dirty || !!pendingPreset || !!(stat && stat.rulesBusy);
+  for (const button of document.querySelectorAll(".preset-quick button, .preset-form button"))
+    button.disabled = !!pendingPreset;
   $("stat-discard").disabled = !dirty;
   for (const refresh of statDerived) refresh();
 }
@@ -154,6 +157,7 @@ function renderStat() {
   if (!choices.some((c) => c.fingerprint === statCharacter)) statCharacter = choices.length ? choices[0].fingerprint : null;
 
   body.append(
+    renderPreset(),
     el("div", { class: "stat-layout" }, renderJobEditor(), renderCharacterEditor(choices)),
     renderStatSummary(),
     el("article", { class: "card stat-card" },
@@ -164,6 +168,76 @@ function renderStat() {
           el("span", { class: "stat-help", text: " Mati (bawaan): musuh memakai nilai asli game walaupun job-nya sama. Nyalakan hanya jika Anda memang ingin musuh ikut berubah. Aturan per karakter tidak pernah berlaku untuk musuh." })))),
     el("p", { class: "reinc-foot", text: "Growth: angka lebih kecil berarti tumbuh lebih cepat. Tiap naik level, stat dasar bertambah sebesar stat dasar ÷ (growth + level). Mengubah growth hanya memengaruhi kenaikan level sesudahnya; level yang sudah didapat tidak dihitung ulang. Multiplier: persen dari stat dasar yang dipakai game, jadi perubahannya langsung terasa. Nilai Speed, PA, dan MA yang tampil di game dibulatkan ke bawah, jadi perubahan kecil bisa belum terlihat." }));
   updateStatButtons();
+}
+
+const presetForm = { scope: "generic", stats: statValues(true), growthPercent: 100, multiplierPercent: 100 };
+let pendingPreset = null;
+
+async function applyPreset() {
+  const stats = STAT_NAMES.flatMap((_, i) => presetForm.stats[i] ? [i] : []);
+  if (!stats.length) return toast("Pilih setidaknya satu stat.");
+  if (pendingPreset) return;
+  const request = {};
+  pendingPreset = request;
+  updateStatButtons();
+  const sent = draftKey(statDraft);
+  try {
+    const rules = await call("applyStatPreset", { rules: rulesFrom(statDraft), preset: { ...presetForm, stats } });
+    if (request !== pendingPreset) return;
+    if (draftKey(statDraft) !== sent) {
+      toast("Draf berubah saat preset dihitung. Terapkan lagi untuk memakai draf terbaru.");
+      return;
+    }
+    statDraft = draftFrom(rules);
+    renderStat();
+    toast(draftKey(statDraft) === sent ? "Draf sudah sesuai dengan preset." : "Preset diterapkan ke draf.", true);
+  } catch (error) {
+    if (request === pendingPreset) toast(error.message);
+  } finally {
+    if (request === pendingPreset) {
+      pendingPreset = null;
+      updateStatButtons();
+    }
+  }
+}
+
+function renderPreset() {
+  const scope = el("select", { class: "stat-select", onchange: e => { presetForm.scope = e.target.value; } },
+    [...STAT_GROUPS.filter(([id]) => id !== "monster"), ["both", "Job umum dan khusus"]].map(([id, name]) =>
+      el("option", { value: id, selected: presetForm.scope === id, text: name })));
+  const percent = (label, key) => el("label", {}, label, el("input", {
+    class: "stat-input", type: "number", min: stat.limits.minPercent, max: stat.limits.maxPercent,
+    step: 1, required: true, value: String(presetForm[key]), oninput: e => { presetForm[key] = e.target.value; },
+  }));
+  const checks = STAT_NAMES.map((name, i) => el("label", { class: "stat-check" },
+    el("input", { type: "checkbox", checked: presetForm.stats[i], onchange: e => { presetForm.stats[i] = e.target.checked; } }), name));
+  const quick = (label, growth, multiplier, names) => el("button", { type: "button", class: "ghost", text: label,
+    onclick: () => {
+      presetForm.stats = STAT_NAMES.map(name => !names || names.includes(name));
+      presetForm.growthPercent = growth;
+      presetForm.multiplierPercent = multiplier;
+      renderStat();
+      applyPreset();
+    } });
+  return el("article", { class: "card stat-card preset-card" },
+    el("div", { class: "stat-card-head" }, el("h3", { text: "Preset" }),
+      el("button", { type: "button", class: "setting-reset", text: "Kembalikan semua job ke bawaan",
+        onclick: () => { pendingPreset = null; statDraft.jobs = {}; renderStat(); } })),
+    el("p", { class: "stat-help", text: "Preset memakai nilai bawaan tiap job. Pilih cakupan, lalu gunakan preset cepat atau atur sendiri. Tekan Simpan untuk menyimpan draf." }),
+    el("label", { class: "preset-scope" }, "Cakupan", scope),
+    el("div", { class: "preset-quick" }, quick("Tumbuh 25% lebih cepat", 125, 100),
+      quick("Tumbuh 50% lebih cepat", 150, 100), quick("HP dan MP +20%", 100, 120, ["HP", "MP"]),
+      quick("Semua stat +10%", 100, 110)),
+    el("form", { class: "preset-form", onsubmit: e => {
+      e.preventDefault();
+      presetForm.growthPercent = Number(presetForm.growthPercent);
+      presetForm.multiplierPercent = Number(presetForm.multiplierPercent);
+      applyPreset();
+    } },
+      el("fieldset", {}, el("legend", { text: "Stat" }), el("div", { class: "preset-checks" }, checks)),
+      el("div", { class: "preset-values" }, percent("Kecepatan tumbuh (%)", "growthPercent"),
+        percent("Multiplier (%)", "multiplierPercent"), el("button", { class: "ghost", type: "submit", text: "Terapkan ke draf" })),
+      el("p", { class: "stat-help", text: "25 sampai 400%. Pada 100%, kolom tersebut tetap seperti di draf." })));
 }
 
 function renderJobEditor() {
@@ -307,4 +381,4 @@ async function saveStat() {
 }
 
 $("stat-save").addEventListener("click", saveStat);
-$("stat-discard").addEventListener("click", () => { statDraft = draftFrom(stat.rules); renderStat(); });
+$("stat-discard").addEventListener("click", () => { pendingPreset = null; statDraft = draftFrom(stat.rules); renderStat(); });

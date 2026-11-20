@@ -94,6 +94,9 @@ public sealed class Bridge
             case "getStatTuning":
                 return ReadStatTuning();
 
+            case "applyStatPreset":
+                return ApplyStatPreset(args);
+
             case "saveStatTuning":
                 return SaveStatTuning(args["rules"]);
 
@@ -148,8 +151,8 @@ public sealed class Bridge
     private object ReadRoster()
     {
         var layout = ReloadedLayout.TryLoad();
-        var mod = layout is null ? null
-            : new ModManager(layout, _catalog).GetState().Mods.FirstOrDefault(m => m.Id == ReincarnationMod);
+        var mods = layout is null ? null : new ModManager(layout, _catalog).GetState().Mods;
+        var mod = mods?.FirstOrDefault(m => m.Id == ReincarnationMod);
         var processIds = GameProcessIds();
 
         string status;
@@ -171,11 +174,17 @@ public sealed class Bridge
         }
 
         var usable = reading?.Status is FeedStatus.Ok or FeedStatus.Stale;
+        var roster = usable ? reading!.Roster : null;
+        if (roster is not null && mods!.Any(m => m.Id == StatTuningMod && m.Installed && m.Enabled)
+            && StatTuningRules.Parse(ReadTextOrNull(_statPaths.RulesFile)) is { IsEmpty: false } tuning)
+            roster = TunedRoster.Apply(roster, tuning, ReadJobs());
+
         return new
         {
             status,
             ageSeconds = usable ? reading!.AgeSeconds : null,
-            roster = usable ? reading!.Roster : null,
+            roster,
+            statTuningApplied = usable && !ReferenceEquals(roster, reading!.Roster),
             commandPending = File.Exists(_paths.CommandFile),
             rules = new
             {
@@ -280,7 +289,7 @@ public sealed class Bridge
         {
             status,
             gameRunning = processIds.Count > 0,
-            jobs = ReadJobs(),
+            jobs = ReadJobs().Values,
             rules = JsonNode.Parse((rules ?? StatTuningRules.Empty).Serialize()),
             rulesUnreadable = rulesText is not null && rules is null,
             rulesBusy,
@@ -295,9 +304,9 @@ public sealed class Bridge
     }
 
     /// <summary>The game's own job values as the mod last wrote them, with names; empty until the game ran once with the mod.</summary>
-    private List<object> ReadJobs()
+    private Dictionary<int, JobDefaults> ReadJobs()
     {
-        var jobs = new List<object>();
+        var jobs = new Dictionary<int, JobDefaults>();
         var text = ReadTextOrNull(_statPaths.JobsFile);
         if (text is null) return jobs;
         try
@@ -310,10 +319,11 @@ public sealed class Bridge
                 var multiplier = entry.GetProperty("multiplier").EnumerateArray().Select(v => v.GetInt32()).ToArray();
                 // Rows without values are unused by the game. Two rows it does use have no name in the list:
                 // job 0xA1 and the row it switches to (0xA4) once its job level reaches 8.
-                var name = JobNames.Find(id) ?? (id is 0xA1 or 0xA4 ? "Job tanpa nama" : null);
-                if (name is null || multiplier.All(v => v == 0)) continue;
-                var group = id < 0x4A ? "special" : id <= 0x5D ? "generic" : "monster";
-                jobs.Add(new { job = id, name, group, growth, multiplier });
+                var job = new JobDefaults(id, growth, multiplier);
+                if (id < 0 || id >= JobTable.Rows || job.Name is null || multiplier.All(v => v == 0)) continue;
+                if (growth.Length != StatBlock.Count || multiplier.Length != StatBlock.Count ||
+                    growth.Concat(multiplier).Any(v => v < 0 || v > byte.MaxValue)) continue;
+                jobs[id] = job;
             }
         }
         catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
@@ -321,6 +331,17 @@ public sealed class Bridge
             jobs.Clear();
         }
         return jobs;
+    }
+
+    private object ApplyStatPreset(JsonObject args)
+    {
+        var draft = StatTuningRules.Parse(args["rules"]?.ToJsonString())
+            ?? throw new ModOperationException("Draf aturan tidak bisa dibaca.");
+        var preset = args["preset"]?.Deserialize<StatPreset>(Json)
+            ?? throw new ModOperationException("Preset tidak bisa dibaca.");
+        var jobs = ReadJobs();
+        if (jobs.Count == 0) throw new ModOperationException("Nilai bawaan job belum terbaca.");
+        return JsonNode.Parse(preset.Apply(draft, jobs.Values).Serialize())!;
     }
 
     private object SaveStatTuning(JsonNode? rules)
