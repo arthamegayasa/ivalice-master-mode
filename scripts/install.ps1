@@ -10,10 +10,14 @@
 
 .EXAMPLE
   .\scripts\install.ps1 -ArchiveDir "$env:USERPROFILE\Downloads"
+
+.PARAMETER ReloadedDir
+  Where Reloaded-II goes. Defaults to the Reloaded-II already set up on this machine,
+  or %LOCALAPPDATA%\Programs\Reloaded-II when there is none.
 #>
 [CmdletBinding()]
 param(
-    [string]$ReloadedDir = 'D:\Modding\Reloaded-II',
+    [string]$ReloadedDir,
     [string]$AppDir,
     [string]$GameDir,
     [string]$ArchiveDir,
@@ -25,6 +29,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not $AppDir) { $AppDir = Join-Path $repo 'dist\IvaliceControlCenter' }
+$loaderConfig = Join-Path $env:APPDATA 'Reloaded-Mod-Loader-II\ReloadedII.json'
+if (-not $ReloadedDir) {
+    $existing = if (Test-Path $loaderConfig) { (Get-Content $loaderConfig -Raw | ConvertFrom-Json).LauncherPath }
+    $ReloadedDir = if ($existing -and (Test-Path $existing)) { Split-Path $existing } else { Join-Path $env:LOCALAPPDATA 'Programs\Reloaded-II' }
+}
+$newlyInstalled = New-Object System.Collections.Generic.List[string]
 $work = Join-Path ([IO.Path]::GetTempPath()) ("ivalice-install-" + [Guid]::NewGuid().ToString('N'))
 $tar = Join-Path $env:SystemRoot 'System32\tar.exe'
 $dotnet = Join-Path $env:ProgramFiles 'dotnet\dotnet.exe'
@@ -35,7 +45,15 @@ function Write-Step([string]$text) { Write-Host "`n== $text" -ForegroundColor Cy
 function Expand-Any([string]$archive, [string]$destination) {
     New-Item -ItemType Directory -Force $destination | Out-Null
     & $tar -xf $archive -C $destination
-    if ($LASTEXITCODE -ne 0) { throw "Could not extract $archive" }
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not extract $archive. The tar.exe that ships with Windows 11 reads .7z; on older Windows, extract it by hand into the Reloaded-II Mods folder."
+    }
+}
+
+function Install-WithWinget([string]$id, [string[]]$extra) {
+    winget install --id $id -e @extra --silent --accept-source-agreements --accept-package-agreements --disable-interactivity | Out-Null
+    # 0x8A15002B: winget reports "already installed, no upgrade available".
+    if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne -1978335189) { throw "winget could not install $id (exit code $LASTEXITCODE)." }
 }
 
 function Get-ReleaseAsset([string]$repoName, [string]$pattern) {
@@ -59,12 +77,14 @@ function Install-ModFolder([string]$extracted, [string]$modsDir) {
     if ((Test-Path $target) -and -not $Force) { Write-Host "   $($mod.Id): already installed"; return }
     New-Item -ItemType Directory -Force $target | Out-Null
     Copy-Item (Join-Path $mod.Root '*') $target -Recurse -Force
+    $newlyInstalled.Add($mod.Id)
     Write-Host "   $($mod.Id): installed"
 }
 
 function Find-Game {
-    $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
-    if (-not $steam) { return $null }
+    $key = Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue
+    if (-not $key -or -not $key.PSObject.Properties['SteamPath']) { return $null }
+    $steam = $key.SteamPath
     $libraries = @($steam)
     $vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
     if (Test-Path $vdf) {
@@ -87,12 +107,12 @@ try {
     $sdks = if (Test-Path $dotnet) { & $dotnet --list-sdks } else { @() }
     if (-not ($sdks -match '^9\.')) {
         Write-Host '   Installing .NET 9 SDK (needed to build the app and two mods)...'
-        winget install --id Microsoft.DotNet.SDK.9 -e --silent --accept-source-agreements --accept-package-agreements --disable-interactivity | Out-Null
+        Install-WithWinget 'Microsoft.DotNet.SDK.9' @()
     }
     $x86 = Join-Path ${env:ProgramFiles(x86)} 'dotnet\shared\Microsoft.WindowsDesktop.App'
     if (-not (Test-Path $x86) -or -not (Get-ChildItem $x86 -Filter '9.*')) {
         Write-Host '   Installing .NET 9 Desktop Runtime x86 (required by the Reloaded-II launcher)...'
-        winget install --id Microsoft.DotNet.DesktopRuntime.9 -e --architecture x86 --silent --accept-source-agreements --accept-package-agreements --disable-interactivity | Out-Null
+        Install-WithWinget 'Microsoft.DotNet.DesktopRuntime.9' @('--architecture', 'x86')
     }
 
     if (-not $GameDir) { $GameDir = Find-Game }
@@ -108,7 +128,6 @@ try {
         Write-Host "   Installed to $ReloadedDir"
     } else { Write-Host '   Already installed' }
 
-    $loaderConfig = Join-Path $env:APPDATA 'Reloaded-Mod-Loader-II\ReloadedII.json'
     if (-not (Test-Path $loaderConfig)) {
         Write-Host '   Starting the launcher once so it writes its configuration...'
         $process = Start-Process $launcher -WorkingDirectory $ReloadedDir -PassThru
@@ -143,21 +162,29 @@ try {
         if ((Test-Path (Join-Path $modsDir $item.Id)) -and -not $Force) { Write-Host "   $($item.Id): already installed"; continue }
         $source = Join-Path $work ($item.Repo -replace '/', '_')
         git clone --quiet --depth 1 "https://github.com/$($item.Repo)" $source
+        if ($LASTEXITCODE -ne 0) { throw "Could not clone $($item.Repo)." }
         & $dotnet build $source -c Release --nologo -v q | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "Build of $($item.Repo) failed." }
+        if (-not (Test-Path (Join-Path $modsDir "$($item.Id)\ModConfig.json"))) {
+            throw "Build of $($item.Repo) succeeded but did not produce $($item.Id) in $modsDir."
+        }
+        $newlyInstalled.Add($item.Id)
         Write-Host "   $($item.Id): built and installed"
     }
 
     Write-Step 'Mods you download yourself (no redistribution licence)'
     $manual = @(
-        @{ Id = 'fftivc.qol.turbo'; Pattern = '*Fast Forward*.zip'; Url = 'https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/192' },
-        @{ Id = 'fft.antiautorotate'; Pattern = '*AntiAutoRotate*.zip'; Url = 'https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/173' }
+        @{ Id = 'fftivc.qol.turbo'; Pattern = '*Fast Forward*'; Url = 'https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/192' },
+        @{ Id = 'fft.antiautorotate'; Pattern = '*AntiAutoRotate*'; Url = 'https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/173' }
     )
     foreach ($item in $manual) {
         if ((Test-Path (Join-Path $modsDir $item.Id)) -and -not $Force) { Write-Host "   $($item.Id): already installed"; continue }
-        $archive = if ($ArchiveDir) { Get-ChildItem $ArchiveDir -Filter $item.Pattern | Sort-Object LastWriteTime | Select-Object -Last 1 }
+        $archive = if ($ArchiveDir) {
+            Get-ChildItem $ArchiveDir -File -Filter $item.Pattern | Where-Object { $_.Extension -in '.zip', '.7z' } |
+                Sort-Object LastWriteTime | Select-Object -Last 1
+        }
         if (-not $archive) {
-            Write-Warning "$($item.Id): download it from $($item.Url), then rerun with -ArchiveDir pointing at the folder that holds the zip."
+            Write-Warning "$($item.Id): not installed. Download it from $($item.Url), keep the file name Nexus gives it, then rerun with -ArchiveDir pointing at the folder that holds it."
             continue
         }
         $folder = Join-Path $work $item.Id
@@ -171,7 +198,22 @@ try {
     $installed = Get-ChildItem $modsDir -Directory | ForEach-Object { $_.Name }
     $wanted = @($catalog.mods | Where-Object { $installed -contains $_.id } | ForEach-Object { $_.id })
     if (Test-Path $appConfigPath) {
-        Write-Host '   Already registered; enabled mods left as they are'
+        # Keep the player's choices, but switch on what this run added along with what those mods need.
+        $appConfig = Get-Content $appConfigPath -Raw | ConvertFrom-Json
+        $enabled = New-Object System.Collections.Generic.List[string]
+        $enabled.AddRange([string[]]@($appConfig.EnabledMods))
+        foreach ($entry in $catalog.mods | Where-Object { $newlyInstalled -contains $_.id }) {
+            foreach ($id in @($entry.requires) + $entry.id) {
+                if (($installed -contains $id) -and -not ($enabled -contains $id)) { $enabled.Add($id) }
+            }
+        }
+        if ($enabled.Count -ne @($appConfig.EnabledMods).Count) {
+            $appConfig.EnabledMods = $enabled.ToArray()
+            [IO.File]::WriteAllText($appConfigPath, ($appConfig | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
+            Write-Host "   Already registered; enabled the newly installed mods"
+        } else {
+            Write-Host '   Already registered; enabled mods left as they are'
+        }
     } else {
         New-Item -ItemType Directory -Force $appDirCfg | Out-Null
         $appConfig = [ordered]@{

@@ -53,6 +53,7 @@ function toast(message, good = false) {
 
 // ---- State ----------------------------------------------------------------------
 let snapshot = null;
+let launchingUntil = 0; // The game takes a few seconds to appear as a process; block a second launch meanwhile.
 const openDetails = new Set();
 
 const GROUPS = [
@@ -113,9 +114,11 @@ function renderHeader() {
       : el("li", { class: "chip ok" }, el("b", { text: "Siap" })),
   );
 
-  play.disabled = snapshot.gameRunning || errors > 0;
+  const launching = !snapshot.gameRunning && Date.now() < launchingUntil;
+  play.disabled = snapshot.gameRunning || launching || errors > 0;
   $("play-sub").textContent = snapshot.gameRunning
     ? "Game sedang berjalan"
+    : launching ? "Sedang menjalankan game…"
     : errors > 0 ? "Perbaiki masalah di bawah dulu" : "Jalankan game dengan mod aktif";
 
   const footer = document.querySelector("footer");
@@ -266,7 +269,7 @@ async function loadLog() {
     const log = await call("getLog");
     problems.replaceChildren();
     if (!log.found) {
-      summary.textContent = "Belum ada log. Log muncul setelah game dijalankan lewat tombol Main.";
+      summary.textContent = "Belum ada log baru. Log muncul setelah game dijalankan lewat tombol Main; log lama diarsipkan Reloaded-II ke OldLogs.zip.";
       lines.textContent = "";
       return;
     }
@@ -306,7 +309,17 @@ $("log-refresh").addEventListener("click", loadLog);
 for (const [id, target] of [["open-mods", "mods"], ["open-logs", "logs"], ["open-reloaded", "reloaded"]]) {
   $(id).addEventListener("click", () => call("open", { target }).catch((e) => toast(e.message)));
 }
-$("play").addEventListener("click", () => act(call("launch"), "Game dijalankan. Tunggu beberapa detik."));
+$("play").addEventListener("click", async () => {
+  $("play").disabled = true;
+  try {
+    snapshot = await call("launch");
+    launchingUntil = Date.now() + 30000;
+    toast("Game dijalankan. Tunggu beberapa detik.", true);
+  } catch (error) {
+    toast(error.message);
+  }
+  render();
+});
 
 async function refresh(full) {
   try {

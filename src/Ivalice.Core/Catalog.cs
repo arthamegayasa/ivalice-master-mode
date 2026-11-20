@@ -44,9 +44,16 @@ public sealed record Catalog(int Schema, CatalogApp App, IReadOnlyList<CatalogMo
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Skip,
     };
 
-    public static Catalog Parse(string json) =>
-        JsonSerializer.Deserialize<Catalog>(json, Options)
-        ?? throw new InvalidDataException("Catalog is empty.");
+    public static Catalog Parse(string json)
+    {
+        var catalog = JsonSerializer.Deserialize<Catalog>(json, Options);
+        if (catalog?.App is null || catalog.Mods is null) throw new InvalidDataException("Catalog has no app or mods.");
+        // Entries may leave these lists out; callers can then rely on them never being null.
+        return catalog with
+        {
+            Mods = catalog.Mods.Select(m => m with { Requires = m.Requires ?? [], Settings = m.Settings ?? [] }).ToList(),
+        };
+    }
 
     public static Catalog Load(string path) => Parse(File.ReadAllText(path));
 

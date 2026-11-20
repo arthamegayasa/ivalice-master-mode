@@ -56,7 +56,8 @@ public sealed class ModManager(ReloadedLayout layout, Catalog catalog)
                 entry.Requires, [], ReadSettings(entry)));
         }
 
-        foreach (var disk in installed.Values.Where(d => catalog.Find(d.Id) is null).OrderBy(d => d.Name))
+        foreach (var disk in installed.Values
+                     .Where(d => catalog.Find(d.Id) is null && d.Supports(catalog.App.Id)).OrderBy(d => d.Name))
         {
             mods.Add(new ModState(
                 disk.Id, disk.Name, disk.Author, "feature", "Lainnya", disk.Description, disk.Description,
@@ -71,7 +72,7 @@ public sealed class ModManager(ReloadedLayout layout, Catalog catalog)
         }).ToList();
 
         return new AppState(
-            catalog.App.Id, catalog.App.Name, appConfig?["AppLocation"]?.GetValue<string>(),
+            catalog.App.Id, catalog.App.Name, AsText(appConfig?["AppLocation"]),
             appConfig is not null, mods, DiagnoseAll(mods, appConfig is not null));
     }
 
@@ -126,7 +127,11 @@ public sealed class ModManager(ReloadedLayout layout, Catalog catalog)
         var checkedValue = Validate(spec, value);
 
         var path = UserConfigPath(entry.Id);
-        var config = ReadObject(path) ?? [];
+        var config = ReadObject(path);
+        if (config is null && File.Exists(path))
+            throw new ModOperationException(
+                $"Berkas pengaturan {entry.Name} tidak bisa dibaca, jadi tidak diubah agar isinya tidak hilang. Periksa {path}.");
+        config ??= [];
         foreach (var s in entry.Settings)
             if (!config.ContainsKey(s.Key)) config[s.Key] = s.Default?.DeepClone();
         config[spec.Key] = checkedValue;
@@ -216,7 +221,7 @@ public sealed class ModManager(ReloadedLayout layout, Catalog catalog)
                 var pair = string.Join('|', new[] { mod.Id, other.Id }.Order(StringComparer.OrdinalIgnoreCase));
                 if (!seen.Add(pair)) continue;
                 notices.Add(new Notice("shared-hook", NoticeLevel.Warning,
-                    $"{mod.Name} dan {other.Name} mengubah fungsi game yang sama. Keduanya dirancang untuk berjalan bersama, tetapi jika XP atau JP terasa janggal, coba nonaktifkan salah satunya.",
+                    $"{mod.Name} dan {other.Name} mengubah fungsi game yang sama. Keduanya termuat tanpa galat, tetapi belum diuji bersama dalam pertarungan. Jika XP atau JP terasa janggal, coba nonaktifkan salah satunya.",
                     [mod.Id, other.Id]));
             }
         }
@@ -236,7 +241,10 @@ public sealed class ModManager(ReloadedLayout layout, Catalog catalog)
     }
 
     private sealed record DiskMod(string Id, string Name, string Author, string Version, string Description,
-        string ProjectUrl, IReadOnlyList<string> Dependencies);
+        string ProjectUrl, IReadOnlyList<string> Dependencies, IReadOnlyList<string> SupportedApps, bool Universal)
+    {
+        public bool Supports(string appId) => Universal || Has(SupportedApps, appId);
+    }
 
     private Dictionary<string, DiskMod> ReadInstalled()
     {
@@ -245,21 +253,28 @@ public sealed class ModManager(ReloadedLayout layout, Catalog catalog)
 
         foreach (var dir in Directory.EnumerateDirectories(layout.ModsDirectory))
         {
+            // Third-party files: anything missing or of the wrong type is skipped rather than trusted.
             var cfg = ReadObject(Path.Combine(dir, "ModConfig.json"));
-            var id = cfg?["ModId"]?.GetValue<string>();
+            var id = AsText(cfg?["ModId"]);
             if (cfg is null || string.IsNullOrWhiteSpace(id)) continue;
-            string Text(string key) => cfg[key]?.GetValue<string>() ?? "";
-            var deps = (cfg["ModDependencies"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToList() ?? [];
+            string Text(string key) => AsText(cfg[key]) ?? "";
             result[id] = new DiskMod(id, Text("ModName") is { Length: > 0 } n ? n : id, Text("ModAuthor"),
-                Text("ModVersion"), Text("ModDescription"), Text("ProjectUrl"), deps);
+                Text("ModVersion"), Text("ModDescription"), Text("ProjectUrl"),
+                Texts(cfg["ModDependencies"]), Texts(cfg["SupportedAppId"]),
+                cfg["IsUniversalMod"] is JsonValue u && u.GetValueKind() == JsonValueKind.True);
         }
         return result;
     }
 
     private JsonObject? ReadAppConfig() => ReadObject(AppConfigPath);
 
-    private static List<string> EnabledIds(JsonObject? appConfig) =>
-        (appConfig?["EnabledMods"] as JsonArray)?.Select(n => n!.GetValue<string>()).ToList() ?? [];
+    private static List<string> EnabledIds(JsonObject? appConfig) => Texts(appConfig?["EnabledMods"]);
+
+    private static string? AsText(JsonNode? node) =>
+        node is JsonValue value && value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : null;
+
+    private static List<string> Texts(JsonNode? node) =>
+        (node as JsonArray)?.Select(AsText).OfType<string>().ToList() ?? [];
 
     private static JsonObject? ReadObject(string path)
     {

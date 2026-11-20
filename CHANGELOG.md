@@ -16,7 +16,7 @@ First release.
   - a button that launches the game through Reloaded-II;
   - a log view that summarises the latest session.
 - `scripts/install.ps1`, which installs Reloaded-II, the catalog mods and the app, and registers the game.
-- A catalog of seven entries: two Reloaded-II libraries, FFT Mod Loader 1.7.5, Improved Fast Forward 0.4.5, AntiAutoRotate 1.0.0, Global JP Boost 0.2.0 and XP Multiplier 0.1.0.
+- A catalog of seven entries: two Reloaded-II libraries, FFT Mod Loader, Improved Fast Forward, AntiAutoRotate, Global JP Boost and XP Multiplier. The install script takes the latest version of each; the versions tested for this release were FFT Mod Loader 1.7.5, Improved Fast Forward 0.4.5, AntiAutoRotate 1.0.0, Global JP Boost 0.2.0 and XP Multiplier 0.1.0.
 
 ### Verified
 
@@ -26,6 +26,7 @@ First release.
 ### Not verified
 
 - Behaviour inside a battle (speed, camera, JP and XP gains) has not been play-tested.
-- The install script was only run on a machine where everything was already installed.
+- The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
+- Global JP Boost and XP Multiplier have not been tested together in a battle.
 
 [0.1.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.1.0

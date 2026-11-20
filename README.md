@@ -35,7 +35,7 @@ Two Reloaded-II libraries (Signature Scanner and Shared Hooks) are installed as 
 
 ## Install
 
-Requirements: Windows 10 or 11, the Steam version of the game, `git` and `winget`. The script installs the .NET 9 SDK and the x86 .NET 9 Desktop Runtime if they are missing.
+Requirements: Windows 11 (the script extracts `.7z` archives with the built-in `tar.exe`, which older Windows versions may not support), the Steam version of the game, `git` and `winget`. The script installs the .NET 9 SDK and the x86 .NET 9 Desktop Runtime if they are missing.
 
 1. Download [Improved Fast Forward](https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/192) and [AntiAutoRotate](https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/173) from Nexus Mods and leave the zip files in one folder. Both are optional.
 2. Run:
@@ -48,9 +48,11 @@ cd ivalice-master-mode
 
 3. Open **Ivalice Control Center** from the desktop shortcut and press **Main**.
 
-The script is safe to run again; it skips what is already installed. Useful parameters: `-ReloadedDir` (where Reloaded-II goes, default `D:\Modding\Reloaded-II`), `-GameDir` (if the game is not found through Steam), `-Force` (reinstall mods), `-NoShortcut`.
+A prebuilt copy of the app is attached to each [release](https://github.com/arthamegayasa/ivalice-master-mode/releases) for machines that already have Reloaded-II and the mods; it needs the .NET 9 Desktop Runtime.
 
-To remove everything, delete the Reloaded-II folder, `%APPDATA%\Reloaded-Mod-Loader-II`, and the desktop shortcut. The game folder itself is only given a `steam_appid.txt`.
+The script is safe to run again; it skips what is already installed. Useful parameters: `-ReloadedDir` (where Reloaded-II goes; defaults to an existing Reloaded-II, otherwise `%LOCALAPPDATA%\Programs\Reloaded-II`), `-GameDir` (if the game is not found through Steam), `-Force` (reinstall mods), `-NoShortcut`.
+
+To remove everything, delete the Reloaded-II folder, `%APPDATA%\Reloaded-Mod-Loader-II`, and the desktop shortcut. Nothing in the game folder is replaced; Reloaded-II adds one small file there, `steam_appid.txt`, so the game can start outside the Steam client.
 
 ## Roadmap
 
@@ -69,8 +71,8 @@ dotnet test tests/Ivalice.Core.Tests
 dotnet build src/Ivalice.ControlCenter -c Release
 ```
 
-- `src/Ivalice.Core`: reads and changes a Reloaded-II profile. All behaviour lives here and is covered by tests.
-- `src/Ivalice.ControlCenter`: a WPF window hosting the HTML interface in `ui/` through WebView2.
+- `src/Ivalice.Core`: reads and changes a Reloaded-II profile (enabled mods, settings, diagnostics, log summary). Covered by tests.
+- `src/Ivalice.ControlCenter`: a WPF window hosting the HTML interface in `ui/` through WebView2, plus launching the game. Checked by hand, not by tests.
 - `catalog/mods.json`: the curated mod descriptions.
 
 ## Credits and licence

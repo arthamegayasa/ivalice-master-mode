@@ -47,7 +47,15 @@ internal sealed class Sandbox : IDisposable
         Directory.CreateDirectory(Layout.LogsDirectory);
     }
 
-    public void InstallMod(string id, string version = "1.0.0", string? name = null, string[]? deps = null)
+    public void InstallRawModConfig(string folder, string json)
+    {
+        var dir = Path.Combine(Layout.ModsDirectory, folder);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "ModConfig.json"), json);
+    }
+
+    public void InstallMod(string id, string version = "1.0.0", string? name = null, string[]? deps = null,
+        string[]? supportedApps = null)
     {
         var dir = Path.Combine(Layout.ModsDirectory, id);
         Directory.CreateDirectory(dir);
@@ -59,6 +67,7 @@ internal sealed class Sandbox : IDisposable
             ["ModVersion"] = version,
             ["ModDescription"] = "from ModConfig",
             ["ModDependencies"] = new JsonArray((deps ?? []).Select(d => (JsonNode)d!).ToArray()),
+            ["SupportedAppId"] = new JsonArray((supportedApps ?? ["game.exe"]).Select(d => (JsonNode)d!).ToArray()),
         };
         File.WriteAllText(Path.Combine(dir, "ModConfig.json"), cfg.ToJsonString());
     }
@@ -170,7 +179,7 @@ public class ModManagerTests
 
         var ex = Assert.Throws<ModOperationException>(() => sb.Manager().SetEnabled("jp", true));
 
-        Assert.Contains("belum terpasang", ex.Message);
+        Assert.Equal("JP belum terpasang, jadi tidak bisa diaktifkan.", ex.Message);
         Assert.Empty(sb.EnabledMods());
     }
 
@@ -181,7 +190,9 @@ public class ModManagerTests
         sb.InstallMod("jp");
         sb.WriteAppConfig();
 
-        Assert.Throws<ModOperationException>(() => sb.Manager().SetEnabled("jp", true));
+        var ex = Assert.Throws<ModOperationException>(() => sb.Manager().SetEnabled("jp", true));
+
+        Assert.Equal("JP membutuhkan Lib, yang belum terpasang.", ex.Message);
         Assert.Empty(sb.EnabledMods());
     }
 
@@ -303,6 +314,82 @@ public class ModManagerTests
 
         var missing = Assert.Single(notices, n => n.Code == "missing-dependency");
         Assert.Equal(NoticeLevel.Error, missing.Level);
+        Assert.Contains("sedang nonaktif", missing.Message);
+    }
+
+    [Fact]
+    public void Diagnostics_say_when_a_dependency_is_not_installed_at_all()
+    {
+        using var sb = new Sandbox();
+        sb.InstallMod("jp");
+        sb.WriteAppConfig("jp");
+
+        var missing = Assert.Single(sb.Manager().GetState().Notices, n => n.Code == "missing-dependency");
+
+        Assert.Contains("belum terpasang", missing.Message);
+    }
+
+    [Fact]
+    public void Saving_a_setting_refuses_to_overwrite_a_config_file_it_cannot_read()
+    {
+        using var sb = new Sandbox();
+        sb.InstallMod("jp");
+        sb.WriteAppConfig();
+        Directory.CreateDirectory(Path.GetDirectoryName(sb.UserConfigPath("jp"))!);
+        const string handEdited = "{ \"JpMultiplier\": 3.0, \"Mine\": 1, }";
+        File.WriteAllText(sb.UserConfigPath("jp"), handEdited);
+
+        var ex = Assert.Throws<ModOperationException>(
+            () => sb.Manager().SetSetting("jp", "JpMultiplier", JsonValue.Create(2.0)));
+
+        Assert.Contains("tidak bisa dibaca", ex.Message);
+        Assert.Equal(handEdited, File.ReadAllText(sb.UserConfigPath("jp")));
+    }
+
+    [Fact]
+    public void A_malformed_mod_folder_does_not_break_the_list()
+    {
+        using var sb = new Sandbox();
+        sb.InstallMod("lib");
+        sb.InstallRawModConfig("broken-id", "{ \"ModId\": 5, \"ModDependencies\": [null] }");
+        sb.InstallRawModConfig("broken-json", "{ not json");
+        sb.InstallRawModConfig("odd-deps",
+            "{ \"ModId\": \"odd\", \"ModName\": 7, \"ModDependencies\": [null, 3, \"lib\"], \"SupportedAppId\": [\"game.exe\"] }");
+        sb.WriteAppConfig("lib");
+
+        var mods = sb.Manager().GetState().Mods;
+
+        Assert.Contains(mods, m => m.Id == "lib" && m.Installed);
+        var odd = mods.Single(m => m.Id == "odd");
+        Assert.Equal("odd", odd.Name);
+        Assert.Equal(["lib"], odd.Requires);
+        Assert.DoesNotContain(mods, m => m.Id == "5");
+    }
+
+    [Fact]
+    public void Uncatalogued_mods_made_for_another_game_are_not_listed()
+    {
+        using var sb = new Sandbox();
+        sb.InstallMod("other.game.mod", supportedApps: ["othergame.exe"]);
+        sb.InstallMod("this.game.mod", supportedApps: ["GAME.EXE"]);
+        sb.WriteAppConfig();
+
+        var ids = sb.Manager().GetState().Mods.Select(m => m.Id).ToList();
+
+        Assert.Contains("this.game.mod", ids);
+        Assert.DoesNotContain("other.game.mod", ids);
+    }
+
+    [Fact]
+    public void A_catalog_entry_may_omit_requires_and_settings()
+    {
+        var catalog = Catalog.Parse(
+            "{ \"schema\": 1, \"app\": { \"id\": \"game.exe\", \"name\": \"Game\", \"steamAppId\": 1 }," +
+            " \"mods\": [ { \"id\": \"bare\", \"name\": \"Bare\", \"author\": \"a\", \"role\": \"feature\", \"category\": \"c\"," +
+            " \"summary\": \"s\", \"details\": \"d\", \"sourceUrl\": \"u\", \"license\": \"MIT\" } ] }");
+
+        Assert.Empty(catalog.Mods[0].Requires);
+        Assert.Empty(catalog.Mods[0].Settings);
     }
 
     [Fact]
