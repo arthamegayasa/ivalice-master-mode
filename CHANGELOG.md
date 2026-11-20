@@ -2,6 +2,36 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-11-21
+
+### Added
+
+- **Move and Jump** in Stat Tuning: a job rule replaces the job's base Move (1 to 12) and Jump (1 to 8); a character rule adds a bonus (-3 to +5) on top of whatever job the character has. The game still adds equipment and ability bonuses afterwards. Enemies are untouched unless job rules are extended to them. The Stat tab shows and edits both, the preset form takes a Move and a Jump bonus, and there is a "Move +1" quick preset.
+- The mod hooks the three places where the game sets a unit's base Move and Jump. With any of the three missing it switches Move and Jump rules off and keeps the others.
+- Draft-only Stat presets for common jobs, character-specific jobs, or both, with four quick choices, a custom stat selection and a reset for all job rules.
+- The Reinkarnasi tab applies saved Stat Tuning rules to current and level-1 stats before equipment and shows a note when tuning contributes. Job 0xA1 keeps its feed values because its effective row is unknown.
+
+### Verified
+
+- 232 Party tests and 34 Core tests passed. The Release Control Center build completed with zero warnings and errors. The new tests cover job groups, per-job defaults, neutral columns, rounding and clamping, zero bytes, preservation of other rules, invalid inputs, both roster stat blocks and feed fallbacks.
+- Ran the Release Control Center in WebView2 with the real 134-job catalog. Exercised all four quick presets, custom HP-only tuning, all three scopes, input bounds, reset, discard, tab switching and an explicit save. Checked that a concurrent manual edit survived both preset calculation and saving, and that discarding a pending preset prevented a late reply from restoring it.
+- Inspected screenshots of the preset card and populated Squire editor at the default window size. The card fit its viewport without horizontal overflow. The app was closed and the test rules file removed, restoring its initial absence.
+
+- 15 further tests cover Move and Jump (job and character rules, the enemy filter, ranges, the write and read round trip, older rule files, the job export, presets, the stub's unit register). The Party test project now has 247 tests.
+
+### Confirmed in play
+
+- On one Chapter 1 save with all eight mods loaded: self-test passed, the two copy sites and the three Move and Jump sites hooked, three battles started and two played for several rounds without a crash.
+- Move and Jump, read from the game's memory in battle: with Ramza's job at Move 6 and Jump 5 his unit held 8 and 5 (6 plus 2 from equipment); a Squire rule of Move 5 gave 5 or 6 depending on equipment; a character bonus of +2 Move and +1 Jump on one Squire gave base 7 and 4. The values were unchanged after level-ups, which recompute them.
+- Enemy Chocobos and Goblins kept the game's Move while a rule set their jobs' Move to 9.
+- From the Control Center with the game running: the "Move +1" preset, a Jump edit and a character rule (HP multiplier 150%, Move +2) were saved; the next battle held exactly those values, and the Reinkarnasi tab showed the tuned HP (73 instead of 49) with its note.
+
+### Not verified
+
+- Which of the game's situations reach the third Move and Jump site (`0x278971`); it is hooked the same way as the second, which level-ups exercised.
+- Move and Jump at the ends of their ranges, on special jobs other than Ramza's, and in story battles.
+- The preset results other than "Move +1" in the game (their arithmetic is the tested one the rules use).
+
 ## [0.5.0] - 2026-11-21
 
 ### Added
@@ -196,6 +226,7 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
+[0.6.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.6.0
 [0.5.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.5.0
 [0.4.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.4.0
 [0.3.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.3.0

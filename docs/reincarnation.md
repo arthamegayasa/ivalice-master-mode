@@ -26,6 +26,8 @@ A raw stat is a 24-bit number in which 16384 is one point, so the baseline is `(
 
 What the game shows for a stat is `raw * M / 100`, shifted right 14 bits, where `M` is the multiplier of the unit's current job, never below 1 and capped at 999 (HP, MP), 50 (Speed) and 99 (PA, MA). The Control Center shows these numbers **before equipment**, so they can be lower than the game's status screen.
 
+When Stat Tuning is installed and enabled, the Control Center applies the saved job rule and then the character rule to the current job's multipliers. It shows the current raw stats and the planned level-1 raw stats with those multipliers, both before equipment. A note appears when the roster includes tuned values. Without applicable rules or catalog data, the tab shows the feed values. It always keeps the feed values for job `0xA1` because the feed omits the job level that selects its upgraded row `0xA4`.
+
 Reincarnation does not change how levels are gained: a level-up still adds `raw / (C + level)` to each raw stat, with `C` the job's growth constant. Because the gain is a share of the current value, a higher start carries through every later level.
 
 ## How the pieces fit
