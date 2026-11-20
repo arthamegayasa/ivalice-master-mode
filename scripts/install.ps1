@@ -106,7 +106,7 @@ try {
     }
     $sdks = if (Test-Path $dotnet) { & $dotnet --list-sdks } else { @() }
     if (-not ($sdks -match '^9\.')) {
-        Write-Host '   Installing .NET 9 SDK (needed to build the app and two mods)...'
+        Write-Host '   Installing .NET 9 SDK (needed to build the app and the mods built from source)...'
         Install-WithWinget 'Microsoft.DotNet.SDK.9' @()
     }
     $x86 = Join-Path ${env:ProgramFiles(x86)} 'dotnet\shared\Microsoft.WindowsDesktop.App'
@@ -182,15 +182,18 @@ try {
         Write-Host "   $($item.Id): patched, built and installed"
     }
 
-    Write-Step 'Smart Auto Battle (this repository)'
-    $ownMod = 'ivalice.battle.smartautobattle'
-    # A first install switches the mod on; after that the player's own on/off choice is kept.
-    $alreadyThere = Test-Path (Join-Path $modsDir $ownMod)
-    & $dotnet build (Join-Path $repo "mods\$ownMod") -c Release --nologo -v q | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Building Smart Auto Battle failed. Close the game if it is running and try again.' }
-    if (-not (Test-Path (Join-Path $modsDir "$ownMod\ModConfig.json"))) { throw "Smart Auto Battle was built but is missing from $modsDir." }
-    if (-not $alreadyThere) { $newlyInstalled.Add($ownMod) }
-    Write-Host "   ${ownMod}: built and installed"
+    Write-Step 'Mods of this repository'
+    foreach ($ownMod in @(
+            @{ Id = 'ivalice.battle.smartautobattle'; Name = 'Smart Auto Battle' },
+            @{ Id = 'ivalice.party.reincarnation'; Name = 'Reincarnation' })) {
+        # A first install switches the mod on; after that the player's own on/off choice is kept.
+        $alreadyThere = Test-Path (Join-Path $modsDir $ownMod.Id)
+        & $dotnet build (Join-Path $repo "mods\$($ownMod.Id)") -c Release --nologo -v q | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "Building $($ownMod.Name) failed. Close the game if it is running and try again." }
+        if (-not (Test-Path (Join-Path $modsDir "$($ownMod.Id)\ModConfig.json"))) { throw "$($ownMod.Name) was built but is missing from $modsDir." }
+        if (-not $alreadyThere) { $newlyInstalled.Add($ownMod.Id) }
+        Write-Host "   $($ownMod.Id): built and installed"
+    }
 
     Write-Step 'Mods you download yourself (no redistribution licence)'
     $manual = @(

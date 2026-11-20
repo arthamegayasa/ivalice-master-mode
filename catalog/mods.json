@@ -140,6 +140,23 @@
         { "key": "SoundOnToggle", "type": "bool", "label": "Bunyi saat saklar ditekan", "help": "Nada tinggi saat nyala, nada rendah saat mati.", "default": true, "advanced": true },
         { "key": "DebugLog", "type": "bool", "label": "Log diagnostik", "help": "Mencatat setiap perintah yang diberikan mod ke log. Hanya untuk pelacakan masalah.", "default": false, "advanced": true }
       ]
+    },
+    {
+      "id": "ivalice.party.reincarnation",
+      "name": "Reincarnation",
+      "author": "arthamegayasa",
+      "role": "feature",
+      "category": "Progres",
+      "summary": "Karakter level 10 ke atas bisa mulai lagi dari level 1 dengan stat awal yang lebih tinggi, permanen dan bertumpuk. Dijalankan dari tab Reinkarnasi.",
+      "details": "Belum diuji di dalam game yang berjalan; aturan dan penulisannya sudah diuji lewat tes otomatis. Nyalakan Mode aman untuk mencobanya tanpa mengubah apa pun. Reinkarnasi mengembalikan level ke 1 dan EXP ke 0, lalu menaikkan stat awal sebesar Power: 0,5% untuk tiap level yang dilepas (level 10 memberi +5%, level 99 memberi +49,5%), bertumpuk sampai +100%. Job, JP, ability, perlengkapan, Brave, dan Faith tidak berubah. Tamu, monster, dan unit yang sedang menjalankan errand tidak bisa bereinkarnasi, dan perintah ditolak selama pertarungan atau adegan cerita. Sebelum perintah dikirim, aplikasi mencadangkan berkas save, dan mod mencatat isi unit sebelum dan sesudahnya di jurnal agar bisa dikembalikan. Perubahan baru permanen setelah game menyimpan, lewat simpan manual maupun otomatis.",
+      "sourceUrl": "https://github.com/arthamegayasa/ivalice-master-mode",
+      "license": "MIT",
+      "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks"],
+      "settings": [
+        { "key": "SafeMode", "type": "bool", "label": "Mode aman", "help": "Mod menampilkan daftar karakter dan memeriksa setiap perintah, tetapi tidak mengubah apa pun di game. Perintah dijawab dengan apa yang akan terjadi.", "default": false },
+        { "key": "ResolveNames", "type": "bool", "label": "Tampilkan nama karakter", "help": "Mod menanyakan nama tiap karakter ke game. Matikan jika game bermasalah dengan mod ini; karakter lalu ditampilkan dengan job dan nomor slot.", "default": true, "advanced": true },
+        { "key": "DebugLog", "type": "bool", "label": "Log diagnostik", "help": "Mencatat alamat daftar party, setiap perubahan hasil pemeriksaan pertarungan, serta setiap perintah dan hasilnya ke log. Hanya untuk pelacakan masalah.", "default": false, "advanced": true }
+      ]
     }
   ]
 }

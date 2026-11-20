@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Ivalice.Core;
+using Ivalice.Party;
 
 namespace Ivalice.ControlCenter;
 
@@ -15,6 +16,7 @@ namespace Ivalice.ControlCenter;
 public sealed class Bridge
 {
     private const string GameProcess = "FFT_enhanced";
+    private const string ReincarnationMod = "ivalice.party.reincarnation";
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -23,6 +25,7 @@ public sealed class Bridge
     };
 
     private readonly Catalog _catalog = Catalog.Load(Path.Combine(AppContext.BaseDirectory, "catalog", "mods.json"));
+    private readonly BridgePaths _paths = BridgePaths.Default;
 
     public string Handle(string requestJson)
     {
@@ -73,6 +76,19 @@ public sealed class Bridge
             case "getLog":
                 return ReadLog();
 
+            case "getRoster":
+                return ReadRoster();
+
+            case "reincarnate":
+                return SendReincarnation(args["slot"]!.GetValue<int>(), args["fingerprint"]!.GetValue<string>(),
+                    args["level"]!.GetValue<int>());
+
+            case "getReincarnationResult":
+                return ReadReincarnationResult(args["commandId"]!.GetValue<string>());
+
+            case "cancelReincarnation":
+                return CancelReincarnation(args["commandId"]!.GetValue<string>());
+
             case "open":
                 Open(args["target"]!.GetValue<string>(), args["value"]?.GetValue<string>());
                 return null;
@@ -105,11 +121,134 @@ public sealed class Bridge
         };
     }
 
-    private static bool IsGameRunning()
+    private static bool IsGameRunning() => GameProcessIds().Count > 0;
+
+    private static List<int> GameProcessIds()
     {
         var found = Process.GetProcessesByName(GameProcess);
+        var ids = found.Select(p => p.Id).ToList();
         foreach (var p in found) p.Dispose();
-        return found.Length > 0;
+        return ids;
+    }
+
+    // ---- Reincarnation: talks to the mod inside the game through the files in BridgePaths ----
+
+    /// <summary>
+    /// The party as the mod last wrote it out, with a status saying whether it can be trusted:
+    /// modNotInstalled, modDisabled, gameNotRunning, noData, unreadable, stale or ok.
+    /// </summary>
+    private object ReadRoster()
+    {
+        var layout = ReloadedLayout.TryLoad();
+        var mod = layout is null ? null
+            : new ModManager(layout, _catalog).GetState().Mods.FirstOrDefault(m => m.Id == ReincarnationMod);
+        var processIds = GameProcessIds();
+
+        string status;
+        FeedReading? reading = null;
+        if (mod is null || !mod.Installed) status = "modNotInstalled";
+        else if (!mod.Enabled) status = "modDisabled";
+        else if (processIds.Count == 0) status = "gameNotRunning";
+        else
+        {
+            reading = RosterFeed.Evaluate(ReadTextOrNull(_paths.RosterFile), DateTimeOffset.UtcNow, processIds);
+            status = reading.Status switch
+            {
+                FeedStatus.Ok => "ok",
+                FeedStatus.Stale => "stale",
+                FeedStatus.Unreadable => "unreadable",
+                // A file from an earlier game session says nothing about this one.
+                _ => "noData",
+            };
+        }
+
+        var usable = reading?.Status is FeedStatus.Ok or FeedStatus.Stale;
+        return new
+        {
+            status,
+            ageSeconds = usable ? reading!.AgeSeconds : null,
+            roster = usable ? reading!.Roster : null,
+            commandPending = File.Exists(_paths.CommandFile),
+            rules = new
+            {
+                minimumLevel = ReincarnationRules.MinimumLevel,
+                permillePerLevel = ReincarnationRules.PermillePerLevel,
+                maxPowerPermille = ReincarnationRules.MaxPowerPermille,
+                commandMaxAgeSeconds = CommandProcessor.MaxAgeSeconds,
+            },
+            journalFile = _paths.JournalFile,
+            saveBackupsDirectory = _paths.SaveBackupsDirectory,
+        };
+    }
+
+    /// <summary>Backs the save files up, then leaves a command for the mod to pick up.</summary>
+    private object SendReincarnation(int slot, string fingerprint, int level)
+    {
+        if (!IsGameRunning()) throw new ModOperationException("Game tidak sedang berjalan.");
+        if (File.Exists(_paths.CommandFile))
+            throw new ModOperationException("Masih ada perintah yang menunggu game. Tunggu sampai selesai atau batalkan dulu.");
+
+        var backup = SaveBackup.Create(SaveBackup.DefaultSaveDirectory, _paths.SaveBackupsDirectory, DateTime.Now);
+
+        var command = new ReincarnationCommand(Guid.NewGuid().ToString("D"), ReincarnationCommand.Reincarnate, slot,
+            fingerprint, level, CommandProcessor.Stamp(DateTimeOffset.UtcNow));
+        try
+        {
+            Directory.CreateDirectory(_paths.BridgeDirectory);
+            // Written under another name first, so the mod never reads half a file.
+            var temporary = _paths.CommandFile + ".tmp";
+            File.WriteAllText(temporary, JsonSerializer.Serialize(command, BridgeJson.Default.ReincarnationCommand));
+            File.Move(temporary, _paths.CommandFile, overwrite: false);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw new ModOperationException("Perintah tidak bisa dikirim ke game: " + e.Message);
+        }
+
+        return new { commandId = command.Id, backupDirectory = backup.Directory, backupFiles = backup.Files };
+    }
+
+    /// <summary>The mod's answer to a command, once it has one. The answer file is removed after reading.</summary>
+    private object ReadReincarnationResult(string commandId)
+    {
+        var path = _paths.ResultFile(ParseCommandId(commandId));
+        var text = ReadTextOrNull(path);
+        if (text is null) return new { done = false, result = (CommandResult?)null };
+
+        CommandResult? result;
+        try { result = JsonSerializer.Deserialize(text, BridgeJson.Default.CommandResult); }
+        catch (JsonException) { result = null; }
+        if (result is null) throw new ModOperationException("Jawaban dari game tidak bisa dibaca.");
+
+        try { File.Delete(path); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        return new { done = true, result = (CommandResult?)result };
+    }
+
+    /// <summary>Takes a command back, if the game has not picked it up yet.</summary>
+    private object CancelReincarnation(string commandId)
+    {
+        var id = ParseCommandId(commandId);
+        var pending = CommandProcessor.Parse(ReadTextOrNull(_paths.CommandFile));
+        if (pending.Id != id) return new { cancelled = false };
+        try
+        {
+            File.Delete(_paths.CommandFile);
+            return new { cancelled = true };
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return new { cancelled = false };
+        }
+    }
+
+    private static Guid ParseCommandId(string commandId) =>
+        Guid.TryParse(commandId, out var id) ? id : throw new ModOperationException("Nomor perintah tidak sah.");
+
+    private static string? ReadTextOrNull(string path)
+    {
+        try { return File.Exists(path) ? File.ReadAllText(path) : null; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
     }
 
     private void Launch()
@@ -155,6 +294,13 @@ public sealed class Bridge
 
     private void Open(string target, string? value)
     {
+        if (target == "saveBackups")
+        {
+            Directory.CreateDirectory(_paths.SaveBackupsDirectory);
+            Shell(_paths.SaveBackupsDirectory);
+            return;
+        }
+
         var layout = Layout();
         switch (target)
         {

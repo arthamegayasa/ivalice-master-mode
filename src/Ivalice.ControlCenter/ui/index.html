@@ -30,6 +30,7 @@
 
   <nav class="tabs" role="tablist">
     <button role="tab" id="tab-mods" aria-controls="view-mods" aria-selected="true" type="button">Mod</button>
+    <button role="tab" id="tab-reinc" aria-controls="view-reinc" aria-selected="false" type="button">Reinkarnasi</button>
     <button role="tab" id="tab-log" aria-controls="view-log" aria-selected="false" type="button">Log</button>
     <span class="tabs-spacer"></span>
     <button class="link" id="open-mods" type="button">Buka folder mod</button>
@@ -40,6 +41,26 @@
     <div id="notices" class="notices" aria-live="polite"></div>
 
     <section id="view-mods" role="tabpanel" aria-labelledby="tab-mods"></section>
+
+    <section id="view-reinc" role="tabpanel" aria-labelledby="tab-reinc" hidden>
+      <div class="reinc-head">
+        <div>
+          <h2>Reinkarnasi</h2>
+          <p class="reinc-intro">Karakter level 10 ke atas bisa memulai lagi dari level 1 dengan stat awal yang lebih tinggi. Setiap level yang dilepas menambah Power 0,5%, permanen dan bertumpuk sampai +100%. Job, JP, ability, perlengkapan, Brave, dan Faith tidak berubah.</p>
+        </div>
+        <div class="log-actions">
+          <button class="ghost" id="reinc-refresh" type="button">Muat ulang</button>
+          <button class="ghost" id="open-backups" type="button">Buka folder cadangan save</button>
+        </div>
+      </div>
+      <div id="reinc-status" class="notices" aria-live="polite"></div>
+      <div id="reinc-waiting" class="reinc-waiting" role="status" aria-live="polite" hidden>
+        <span id="reinc-waiting-text"></span>
+        <button class="ghost" id="reinc-cancel" type="button">Batalkan perintah</button>
+      </div>
+      <div id="reinc-units" class="cards"></div>
+      <p id="reinc-foot" class="reinc-foot" hidden>Angka stat adalah nilai dasar pada job sekarang, tanpa bonus perlengkapan, jadi bisa lebih rendah daripada layar status di game.</p>
+    </section>
 
     <section id="view-log" role="tabpanel" aria-labelledby="tab-log" hidden>
       <div class="log-head">
@@ -58,6 +79,15 @@
     <span id="footer-note">Perubahan berlaku saat game dijalankan berikutnya.</span>
     <span id="version"></span>
   </footer>
+
+  <dialog id="reinc-dialog" aria-labelledby="reinc-dialog-title">
+    <h2 id="reinc-dialog-title"></h2>
+    <ul id="reinc-dialog-points"></ul>
+    <div class="dialog-actions">
+      <button class="ghost" id="reinc-dialog-cancel" type="button">Batal</button>
+      <button class="confirm" id="reinc-dialog-confirm" type="button">Reinkarnasi</button>
+    </div>
+  </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="app.js"></script>
