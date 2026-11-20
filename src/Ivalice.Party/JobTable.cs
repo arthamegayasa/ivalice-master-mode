@@ -27,6 +27,8 @@ public static class JobTable
     public const int RowSize = 0x31;
     public const int TableSize = Rows * RowSize;
     public const int GrowthOffset = 0x0E;
+    public const int MoveOffset = 0x18;
+    public const int JumpOffset = 0x19;
 
     private const byte SpecialJob = 0xA1;
     private const byte SpecialJobUpgradedRow = 0xA4;

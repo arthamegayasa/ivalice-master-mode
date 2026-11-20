@@ -10,7 +10,12 @@ namespace Ivalice.Party;
 /// </summary>
 public sealed record JobTuning(IReadOnlyList<int?> Growth, IReadOnlyList<int?> Multiplier)
 {
-    public bool IsEmpty => Growth.All(v => v is null) && Multiplier.All(v => v is null);
+    /// <summary>Replacement for the job's base Move (tiles), before equipment and abilities; null keeps the game's.</summary>
+    public int? Move { get; init; }
+    /// <summary>Replacement for the job's base Jump, before equipment and abilities; null keeps the game's.</summary>
+    public int? Jump { get; init; }
+
+    public bool IsEmpty => Growth.All(v => v is null) && Multiplier.All(v => v is null) && Move is null && Jump is null;
 }
 
 /// <summary>
@@ -19,7 +24,12 @@ public sealed record JobTuning(IReadOnlyList<int?> Growth, IReadOnlyList<int?> M
 /// </summary>
 public sealed record CharacterTuning(string? Name, IReadOnlyList<int> GrowthPercent, IReadOnlyList<int> MultiplierPercent)
 {
-    public bool IsEmpty => GrowthPercent.All(v => v == 100) && MultiplierPercent.All(v => v == 100);
+    /// <summary>Added to the base Move the character's current job gives (after any job rule). 0 changes nothing.</summary>
+    public int MoveBonus { get; init; }
+    /// <summary>Added to the base Jump the character's current job gives (after any job rule). 0 changes nothing.</summary>
+    public int JumpBonus { get; init; }
+
+    public bool IsEmpty => GrowthPercent.All(v => v == 100) && MultiplierPercent.All(v => v == 100) && MoveBonus == 0 && JumpBonus == 0;
 }
 
 /// <summary>
@@ -33,6 +43,13 @@ public sealed class StatTuningRules
     public const int MaxByte = 255;
     public const int MinPercent = 25;
     public const int MaxPercent = 400;
+    public const int MinMove = 1;
+    /// <summary>Base Move is held well below the size of a map; equipment and abilities still add to it.</summary>
+    public const int MaxMove = 12;
+    public const int MinJump = 1;
+    public const int MaxJump = 8;
+    public const int MinBonus = -3;
+    public const int MaxBonus = 5;
     /// <summary>Growth and multiplier pairs for HP, MP, Speed, Physical Attack and Magick Attack.</summary>
     public const int PairBytes = StatBlock.Count * 2;
 
@@ -93,6 +110,31 @@ public sealed class StatTuningRules
         return changed;
     }
 
+    /// <summary>
+    /// Rewrites the base Move and Jump the game just took from a job row, in place. Equipment and
+    /// ability bonuses are added by the game afterwards.
+    /// </summary>
+    /// <returns>True when a value changed.</returns>
+    public bool ApplyMovement(ref byte move, ref byte jump, int jobRow, bool playerOwned, string? fingerprint)
+    {
+        var (oldMove, oldJump) = (move, jump);
+
+        if ((playerOwned || ApplyJobsToEnemies) && Jobs.TryGetValue(jobRow, out var job))
+        {
+            if (job.Move is { } newMove) move = (byte)newMove;
+            if (job.Jump is { } newJump) jump = (byte)newJump;
+        }
+
+        if (playerOwned && fingerprint is not null && Characters.TryGetValue(fingerprint, out var character))
+        {
+            // A bonus of 0 keeps the very value the job gave, also where that is outside the range.
+            if (character.MoveBonus != 0) move = (byte)Math.Clamp(move + character.MoveBonus, MinMove, MaxMove);
+            if (character.JumpBonus != 0) jump = (byte)Math.Clamp(jump + character.JumpBonus, MinJump, MaxJump);
+        }
+
+        return move != oldMove || jump != oldJump;
+    }
+
     internal static int ScaleGrowth(int value, int percent) => Scale(value * 100, percent);
     internal static int ScaleMultiplier(int value, int percent) => Scale(value * percent, 100);
 
@@ -134,7 +176,11 @@ public sealed class StatTuningRules
                     if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("job", out var id)
                         || id.ValueKind != JsonValueKind.Number || !id.TryGetInt32(out var row)) continue;
                     if (row < 0 || row >= JobTable.Rows) continue;
-                    var tuning = new JobTuning(Bytes(entry, "growth"), Bytes(entry, "multiplier"));
+                    var tuning = new JobTuning(Bytes(entry, "growth"), Bytes(entry, "multiplier"))
+                    {
+                        Move = Whole(entry, "move", MinMove, MaxMove),
+                        Jump = Whole(entry, "jump", MinJump, MaxJump),
+                    };
                     if (!tuning.IsEmpty) jobs[row] = tuning;
                 }
             }
@@ -148,7 +194,11 @@ public sealed class StatTuningRules
                     var fingerprint = key.GetString()!.Trim().ToUpperInvariant();
                     if (fingerprint.Length != 8 || !fingerprint.All(Uri.IsHexDigit)) continue;
                     var name = entry.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
-                    var tuning = new CharacterTuning(name, Percents(entry, "growthPercent"), Percents(entry, "multiplierPercent"));
+                    var tuning = new CharacterTuning(name, Percents(entry, "growthPercent"), Percents(entry, "multiplierPercent"))
+                    {
+                        MoveBonus = Whole(entry, "moveBonus", MinBonus, MaxBonus) ?? 0,
+                        JumpBonus = Whole(entry, "jumpBonus", MinBonus, MaxBonus) ?? 0,
+                    };
                     if (!tuning.IsEmpty) characters[fingerprint] = tuning;
                 }
             }
@@ -160,6 +210,12 @@ public sealed class StatTuningRules
             return null;
         }
     }
+
+    /// <summary>A whole number pulled into range, or null when the property is absent or not a whole number.</summary>
+    private static int? Whole(JsonElement entry, string property, int low, int high) =>
+        entry.TryGetProperty(property, out var item) && item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out var value)
+            ? Math.Clamp(value, low, high)
+            : null;
 
     private static int?[] Bytes(JsonElement entry, string property)
     {
@@ -206,6 +262,8 @@ public sealed class StatTuningRules
                 if (JobNames.Find(row) is { } name) writer.WriteString("name", name);
                 WriteList(writer, "growth", job.Growth);
                 WriteList(writer, "multiplier", job.Multiplier);
+                if (job.Move is { } move) writer.WriteNumber("move", move);
+                if (job.Jump is { } jump) writer.WriteNumber("jump", jump);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();
@@ -218,6 +276,8 @@ public sealed class StatTuningRules
                 if (character.Name is not null) writer.WriteString("name", character.Name);
                 WriteList(writer, "growthPercent", character.GrowthPercent.Select(v => (int?)v).ToArray());
                 WriteList(writer, "multiplierPercent", character.MultiplierPercent.Select(v => (int?)v).ToArray());
+                if (character.MoveBonus != 0) writer.WriteNumber("moveBonus", character.MoveBonus);
+                if (character.JumpBonus != 0) writer.WriteNumber("jumpBonus", character.JumpBonus);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();
@@ -251,6 +311,9 @@ public readonly record struct TunedUnit(int JobRow, bool PlayerOwned, string? Fi
     private const byte SpecialJobUpgradedRow = 0xA4;
     /// <summary>Where the game keeps the pairs it copied from the job row.</summary>
     public const int Pairs = 0x8A;
+    /// <summary>The unit's Move, then its Jump: the job's base values until the game adds equipment and abilities.</summary>
+    public const int Move = 0x42;
+    public const int Jump = 0x43;
 
     /// <param name="unit">A battle unit record (0x200 bytes), also the form the game builds for its menus.</param>
     /// <param name="roster">The party roster, or empty when it is not known.</param>
@@ -301,6 +364,9 @@ public static class JobCatalog
                 writer.WriteStartArray("multiplier");
                 for (var stat = 0; stat < StatBlock.Count; stat++) writer.WriteNumberValue(pairs[stat * 2 + 1]);
                 writer.WriteEndArray();
+                // The game masks the top bit of the Jump byte off before it uses it.
+                writer.WriteNumber("move", jobTable[row * JobTable.RowSize + JobTable.MoveOffset]);
+                writer.WriteNumber("jump", jobTable[row * JobTable.RowSize + JobTable.JumpOffset] & 0x7F);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();

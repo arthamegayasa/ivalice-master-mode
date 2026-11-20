@@ -165,7 +165,7 @@
       "author": "arthamegayasa",
       "role": "feature",
       "category": "Progres",
-      "summary": "Mengubah growth (kecepatan tumbuh stat saat naik level) dan multiplier stat per job atau per karakter. Diatur dari tab Stat; musuh tidak ikut berubah kecuali Anda izinkan.",
+      "summary": "Mengubah growth (kecepatan tumbuh stat saat naik level), multiplier stat, serta Move dan Jump per job atau per karakter. Diatur dari tab Stat; musuh tidak ikut berubah kecuali Anda izinkan.",
       "details": "Game menyalin sepuluh angka (growth dan multiplier untuk HP, MP, Speed, PA, MA) dari job ke setiap unit, lalu menghitung stat dan kenaikan level dari salinan itu. Mod ini mengganti salinan milik unit Anda sesuai aturan di tab Stat; tabel job game sendiri tidak diubah, jadi musuh dengan job yang sama tetap memakai nilai asli. Multiplier langsung terasa (layar Units dan pertarungan berikutnya). Growth hanya memengaruhi kenaikan level sesudah aturan disimpan. Aturan yang disimpan saat game berjalan dipakai tanpa perlu menutup game. Mematikan mod ini mengembalikan multiplier ke bawaan; stat dasar yang sudah bertambah lewat growth tetap tersimpan di save. Sudah diuji di game pada satu save.",
       "sourceUrl": "https://github.com/arthamegayasa/ivalice-master-mode",
       "license": "MIT",

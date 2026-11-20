@@ -21,6 +21,19 @@ Raw stats live in the save; growth and multipliers do not. So a growth rule leav
 
 "The player's" means the unit's team bits (battle unit `+0x05`, mask `0x30`) are zero. A character rule also needs the unit's roster slot (`+0x02`) to hold a record with the same character marker; the rule is found by the same fingerprint the Reinkarnasi tab uses (character marker, sex, birthday, name key).
 
+## Move and Jump
+
+Move and Jump are whole numbers of tiles, so they are not tuned by percentage:
+
+- **Per job**: a replacement for the job's base Move (1 to 12) or Jump (1 to 8).
+- **Per character**: a bonus from -3 to +5, added to the base value of whatever job the character has (after any job rule) and held within the same ranges. A bonus of 0 leaves the value exactly as the job gives it.
+
+Both act on the base value. The game adds equipment and ability bonuses (shoes, Move +1 and the like) afterwards, so the number in the game can be higher than the one in the tab. The enemy rule is the same as for the other stats.
+
+The job table holds Move at `+0x18` and Jump at `+0x19` of a row (the top bit of the Jump byte is a flag the game masks off). Three places copy them into a unit record at `+0x42` and `+0x43`: in the routine that applies a job (`0x276D35`) and in the two routines that recompute a unit's derived values (`0x278727`, `0x27896E`; the first of these runs on a level-up). A fourth routine (`0x2779EC`) then adds the equipment bonuses to what is there. The mod hooks right after each of the three copies and rewrites the two bytes. Because every recomputation starts again from the job table, a bonus is never added twice. If any of the three places is not found, the mod switches Move and Jump rules off rather than apply them in some situations only.
+
+The preset form takes a Move and a Jump bonus too: it adds them to each job's own base value and stores the result as a job rule.
+
 ## Presets in the Stat tab
 
 Choose **Job umum** (IDs 0x4A through 0x5D), **Job khusus karakter** (IDs below 0x4A), or both. Quick presets apply to the selected group in one click. The two growth buttons set speed to 125% or 150% for all stats. **HP dan MP +20%** sets the two multipliers to 120%, and **Semua stat +10%** sets all multipliers to 110%.
@@ -64,7 +77,7 @@ All under `%LOCALAPPDATA%\IvaliceControlCenter\stat-tuning`:
 }
 ```
 
-Each list is in the order HP, MP, Speed, PA, MA. The character list of the tab comes from the Reincarnation mod's roster feed, so that mod has to be enabled to pick a character; rules already saved can be edited without it.
+A job entry may also carry `"move"` and `"jump"`, and a character entry `"moveBonus"` and `"jumpBonus"`; rule files written before these existed read as before. Each list is in the order HP, MP, Speed, PA, MA. The character list of the tab comes from the Reincarnation mod's roster feed, so that mod has to be enabled to pick a character; rules already saved can be edited without it.
 
 ## Confirmed in play
 
@@ -81,8 +94,11 @@ On one Chapter 1 save, with the seven other mods of this project loaded:
 
 An independent review (GPT 6.2 Astra) found no fault in the hook stub, the stack alignment at both sites or the relocation of the two hooked instructions, and confirmed that all four patterns match exactly once. Its findings in the rules and the app are fixed: a saved rules file that cannot be opened is no longer treated as "no rules" and is never overwritten in that state, an edit made while the app waits for the host is kept, a character stat left at 100% keeps the job's byte, a rules document with lists of the wrong shape is refused instead of read as empty, table addresses are checked over their whole length, and a failed installation of the second hook removes the first.
 
+Move and Jump (same day, same save): the three sites hooked; in battle Ramza's unit held Move 8 and Jump 5 under a job rule of 6 and 5 (his equipment adds 2), a Squire rule of Move 5 gave 5 or 6 depending on equipment, and a character bonus of +2 and +1 gave base 7 and 4. The values were the same after level-ups. Enemy Chocobos and Goblins kept the game's Move under a rule of 9 for their jobs. Rules saved from the Control Center while the game ran ("Move +1" preset, a Jump edit, a character bonus) were the ones the next battle held.
+
 ## Not verified
 
+- Which situations reach the third Move and Jump site (`0x278971`), and Move and Jump at the ends of their ranges.
 - "Aturan job berlaku juga untuk musuh" switched on, in the game. The rule logic is covered by tests only.
 - Story battles, guests in battle, and special jobs other than Ramza's.
 - A job change, and a unit changing form, during a battle.

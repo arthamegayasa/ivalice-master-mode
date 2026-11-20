@@ -298,6 +298,9 @@ public sealed class Bridge
             {
                 minValue = StatTuningRules.MinByte, maxValue = StatTuningRules.MaxByte,
                 minPercent = StatTuningRules.MinPercent, maxPercent = StatTuningRules.MaxPercent,
+                minMove = StatTuningRules.MinMove, maxMove = StatTuningRules.MaxMove,
+                minJump = StatTuningRules.MinJump, maxJump = StatTuningRules.MaxJump,
+                minBonus = StatTuningRules.MinBonus, maxBonus = StatTuningRules.MaxBonus,
             },
             rulesFile = _statPaths.RulesFile,
         };
@@ -319,7 +322,12 @@ public sealed class Bridge
                 var multiplier = entry.GetProperty("multiplier").EnumerateArray().Select(v => v.GetInt32()).ToArray();
                 // Rows without values are unused by the game. Two rows it does use have no name in the list:
                 // job 0xA1 and the row it switches to (0xA4) once its job level reaches 8.
-                var job = new JobDefaults(id, growth, multiplier);
+                // Catalogs written before the mod recorded Move and Jump have neither; they read as 0, "unknown".
+                var job = new JobDefaults(id, growth, multiplier)
+                {
+                    Move = entry.TryGetProperty("move", out var move) && move.TryGetInt32(out var m) ? m : 0,
+                    Jump = entry.TryGetProperty("jump", out var jump) && jump.TryGetInt32(out var j) ? j : 0,
+                };
                 if (id < 0 || id >= JobTable.Rows || job.Name is null || multiplier.All(v => v == 0)) continue;
                 if (growth.Length != StatBlock.Count || multiplier.Length != StatBlock.Count ||
                     growth.Concat(multiplier).Any(v => v < 0 || v > byte.MaxValue)) continue;

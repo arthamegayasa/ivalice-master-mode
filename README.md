@@ -50,8 +50,8 @@ The tab lists the party with each character's stats, reincarnation count and Pow
 
 The **Stat** tab changes how fast stats grow on a level-up (growth) and how much of a raw stat the game uses (multiplier), for HP, MP, Speed, PA and MA:
 
-- per job, as replacement values shown next to the game's own;
-- per character, as percentages on top of whatever job the character has;
+- per job, as replacement values shown next to the game's own, including the job's base Move and Jump;
+- per character, as percentages on top of whatever job the character has, plus a Move and a Jump bonus;
 - for your units only: enemies with the same job keep the game's values unless you switch that on.
 
 The **Preset** card fills a draft for common jobs, character-specific jobs, or both. Use a quick preset or choose the stats and growth speed and multiplier percentages. Each job scales from its own defaults. **Simpan** saves the draft and **Batalkan perubahan** discards it. The **Reinkarnasi** tab includes saved tuning in its current and level-1 stats before equipment when the job row is known.

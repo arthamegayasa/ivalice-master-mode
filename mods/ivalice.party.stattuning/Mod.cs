@@ -42,6 +42,22 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private const string CopySiteBPattern = "4C 8D 47 0E 48 8D 8B 8A 00 00 00 E8 ?? ?? ?? ?? 48 8B D5 48 8B CB E8";
     private const int CopySiteBHookOffset = 0x10;
 
+    // The three places that put a job row's base Move and Jump into a unit record (+0x42, +0x43).
+    // Equipment and ability bonuses are added later by another routine, on top of what is there.
+    //   Site 1, in the routine that applies a job (unit in rbx):
+    //     mov [rbx+0x42], al / mov al, [rdi+0x19] / and al, 0x7F / mov [rbx+0x43], al / mov al, cl / and al, 0xBF / or cl, 0x40
+    //     The hook goes on the last three instructions and runs before them.
+    //   Sites 2 and 3, in the two routines that recompute a unit's derived values (unit in rdi):
+    //     mov [rdi+0x42], al / mov al, [r8+r10+0x19] / and al, 0x7F / mov [rdi+0x43], al / add rdx, r8 / je ...
+    //     The hook covers the three instructions from "mov al" on and runs after them, before "add".
+    //     The two differ only in the distance of the "je".
+    private const string MoveSite1Pattern = "88 43 42 8A 47 19 24 7F 88 43 43 8A C1 24 BF 80 C9 40";
+    private const int MoveSite1HookOffset = 0x0B;
+    private const string MoveSite2Pattern = "88 47 42 43 8A 44 10 19 24 7F 88 47 43 49 03 D0 74 18";
+    private const string MoveSite3Pattern = "88 47 42 43 8A 44 10 19 24 7F 88 47 43 49 03 D0 74 19";
+    private const int MoveSiteHookOffset = 0x03;
+    private const int MoveSiteHookLength = 10;
+
     /// <summary>How often the rules file is checked for a change.</summary>
     private const int PollMilliseconds = 1000;
     private const int MaxDiagnosticLines = 60;
@@ -59,6 +75,9 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private byte* _roster;
     private byte* _jobTable;
     private int _siteA = -1;
+    private int _moveSite1 = -1;
+    private int _moveSite2 = -1;
+    private int _moveSite3 = -1;
 
     private readonly List<IAsmHook> _unitHooks = [];
     private readonly List<IReverseWrapper<UnitCallback>> _unitCallbacks = [];
@@ -99,6 +118,9 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         scanner.AddMainModuleScan(RosterPattern, r => _roster = RipTarget(r.Found, r.Offset, RosterLeaOffset, 3, 7, 0, RosterLayout.TableSize));
         scanner.AddMainModuleScan(JobTablePattern, r =>
             _jobTable = RipTarget(r.Found, r.Offset, JobTableLeaOffset, 3, 7, -JobTable.GrowthOffset, JobTable.TableSize));
+        scanner.AddMainModuleScan(MoveSite1Pattern, r => _moveSite1 = r.Found ? r.Offset + MoveSite1HookOffset : -1);
+        scanner.AddMainModuleScan(MoveSite2Pattern, r => _moveSite2 = r.Found ? r.Offset + MoveSiteHookOffset : -1);
+        scanner.AddMainModuleScan(MoveSite3Pattern, r => _moveSite3 = r.Found ? r.Offset + MoveSiteHookOffset : -1);
         scanner.AddMainModuleScan(CopySiteAPattern, r => _siteA = r.Found ? r.Offset + CopySiteAHookOffset : -1);
         scanner.AddMainModuleScan(CopySiteBPattern, r => Activate(_siteA, r.Found ? r.Offset + CopySiteBHookOffset : -1));
     }
@@ -150,12 +172,25 @@ public unsafe class Mod : ModBase // <= Do not Remove.
                 _unitHooks.Add(hook);
             }
 
+            // Move and Jump need all three places: with one missing, a unit would get the tuned value in
+            // some situations and the game's in others.
+            var movement = _moveSite1 >= 0 && _moveSite2 >= 0 && _moveSite3 >= 0;
+            if (movement)
+            {
+                InstallMovementHook(_moveSite1, "rbx", new AsmHookOptions { Behaviour = AsmHookBehaviour.ExecuteFirst, PreferRelativeJump = true, MaxOpcodeSize = 5 });
+                foreach (var site in new[] { _moveSite2, _moveSite3 })
+                    InstallMovementHook(site, "rdi", new AsmHookOptions { Behaviour = AsmHookBehaviour.ExecuteAfter, PreferRelativeJump = true, MaxOpcodeSize = 5, hookLength = MoveSiteHookLength });
+            }
+            else Log("Could not find all three places where the game sets a unit's Move and Jump: rules for Move and Jump are off, the other rules still work.");
+
             Directory.CreateDirectory(_paths.Root);
             LoadRules();
             _poll = new Timer(_ => Poll(), null, PollMilliseconds, PollMilliseconds);
 
             var rules = _rules;
-            Log($"Ready: copy sites hooked at 0x{_gameBase + siteA:X} and 0x{_gameBase + siteB:X}, roster at 0x{(nint)_roster:X}, " +
+            Log($"Ready: copy sites hooked at 0x{_gameBase + siteA:X} and 0x{_gameBase + siteB:X}, " +
+                (movement ? $"Move and Jump sites at 0x{_gameBase + _moveSite1:X}, 0x{_gameBase + _moveSite2:X} and 0x{_gameBase + _moveSite3:X}, " : "") +
+                $"roster at 0x{(nint)_roster:X}, " +
                 $"job table at 0x{(nint)_jobTable:X}. Rules: {Describe(rules)}. File: {_paths.RulesFile}");
         }
         catch (Exception e)
@@ -171,6 +206,16 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             _poll = null;
             Log($"The hooks could not be installed ({e.Message}). The mod is inactive.");
         }
+    }
+
+    private void InstallMovementHook(int site, string unitRegister, AsmHookOptions options)
+    {
+        var assembly = HookStub.Build(_hooks!.Utilities.GetAbsoluteCallMnemonics<UnitCallback>(OnUnitMovement, out var callback),
+            atFunctionEntry: false, unitRegister);
+        _unitCallbacks.Add(callback);
+        var hook = _hooks.CreateAsmHook(assembly, _gameBase + site, options);
+        hook.Activate();
+        _unitHooks.Add(hook);
     }
 
     private static string Describe(StatTuningRules rules) =>
@@ -259,10 +304,46 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         }
     }
 
+    /// <summary>
+    /// Runs on a game thread right after the game put a job's base Move and Jump into <paramref name="unit"/>,
+    /// before it adds equipment and abilities. Nothing here may throw.
+    /// </summary>
+    private void OnUnitMovement(byte* unit)
+    {
+        try
+        {
+            var rules = _rules;
+            if (_selfTesting || unit == null || rules.IsEmpty) return;
+
+            var record = new ReadOnlySpan<byte>(unit, BattleBinding.Stride);
+            var roster = _roster != null ? new ReadOnlySpan<byte>(_roster, RosterLayout.TableSize) : default;
+            var identity = TunedUnit.Identify(record, roster);
+
+            Span<byte> before = [unit[TunedUnit.Move], unit[TunedUnit.Jump]];
+            if (!rules.ApplyMovement(ref unit[TunedUnit.Move], ref unit[TunedUnit.Jump], identity.JobRow, identity.PlayerOwned, identity.Fingerprint)) return;
+
+            _changedUnits++;
+            if (_configuration.DebugLog) Diagnose(identity, before, [unit[TunedUnit.Move], unit[TunedUnit.Jump]]);
+        }
+        catch (Exception e)
+        {
+            var first = !_reportedFailure;
+            _reportedFailure = true;
+            try
+            {
+                if (first) Log($"Unexpected error while tuning a unit's Move and Jump ({e.Message}). The unit may hold the game's values or the tuned ones.");
+            }
+            catch (Exception)
+            {
+                // Nothing may leave this method.
+            }
+        }
+    }
+
     private void Diagnose(TunedUnit identity, ReadOnlySpan<byte> before, ReadOnlySpan<byte> after)
     {
         var line = $"job 0x{identity.JobRow:X2} ({JobNames.Find(identity.JobRow) ?? "unnamed"}), {(identity.PlayerOwned ? "player" : "other")}, " +
-                   $"character {identity.Fingerprint ?? "none"}: {Convert.ToHexString(before)} -> {Convert.ToHexString(after)}";
+                   $"character {identity.Fingerprint ?? "none"}: {(before.Length == 2 ? "move/jump " : "")}{Convert.ToHexString(before)} -> {Convert.ToHexString(after)}";
         lock (_diagnosed)
         {
             if (_diagnosed.Count >= MaxDiagnosticLines || !_diagnosed.Add(line)) return;
