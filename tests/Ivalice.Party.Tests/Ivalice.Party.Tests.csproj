@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <!-- The hooking library the game loads, to run the mod's hook stub for real. -->
+    <PackageReference Include="Reloaded.Hooks" Version="4.3.3" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Ivalice.Party\Ivalice.Party.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The mod's hook stub and register probe need no running game, so they are tested here. -->
+    <Compile Include="..\..\mods\ivalice.party.reincarnation\HookStub.cs" Link="Mod\HookStub.cs" />
+    <Compile Include="..\..\mods\ivalice.party.reincarnation\RegisterSelfTest.cs" Link="Mod\RegisterSelfTest.cs" />
+  </ItemGroup>
+
+</Project>
