@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>IvaliceControlCenter</AssemblyName>
+    <RootNamespace>Ivalice.ControlCenter</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+    <Product>Ivalice Control Center</Product>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ivalice.Core\Ivalice.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="ui\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\catalog\mods.json" Link="catalog\mods.json" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="app.ico" />
+  </ItemGroup>
+
+</Project>

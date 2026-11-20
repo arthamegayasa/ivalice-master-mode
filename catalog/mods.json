@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "app": {
+    "id": "fft_enhanced.exe",
+    "name": "FINAL FANTASY TACTICS - The Ivalice Chronicles (Enhanced)",
+    "steamAppId": 1004640
+  },
+  "mods": [
+    {
+      "id": "Reloaded.Memory.SigScan.ReloadedII",
+      "name": "Signature Scanner",
+      "author": "Sewer56",
+      "role": "foundation",
+      "category": "Fondasi",
+      "summary": "Pustaka pencari pola kode. Dipakai mod lain untuk menemukan fungsi game.",
+      "details": "Tidak mengubah permainan. Mod lain memintanya mencari lokasi fungsi di dalam game, sehingga mod tetap bekerja walau alamat memori berubah.",
+      "sourceUrl": "https://github.com/Reloaded-Project/Reloaded.Memory.SigScan",
+      "license": "LGPL-3.0",
+      "requires": [],
+      "settings": []
+    },
+    {
+      "id": "reloaded.sharedlib.hooks",
+      "name": "Shared Hooks Library",
+      "author": "Sewer56",
+      "role": "foundation",
+      "category": "Fondasi",
+      "summary": "Pustaka hook. Dipakai mod lain untuk menyisipkan kode ke fungsi game.",
+      "details": "Tidak mengubah permainan. Menyediakan mekanisme 'hook' yang memungkinkan mod mencegat dan mengubah perilaku fungsi game.",
+      "sourceUrl": "https://github.com/Sewer56/Reloaded.SharedLib.Hooks.ReloadedII",
+      "license": "LGPL-3.0",
+      "requires": [],
+      "settings": []
+    },
+    {
+      "id": "fftivc.utility.modloader",
+      "name": "FFT Mod Loader",
+      "author": "Nenkai",
+      "role": "foundation",
+      "category": "Fondasi",
+      "summary": "Pemuat mod khusus game ini: berkas, tabel data, dan tekstur.",
+      "details": "Fondasi untuk mod data. Memungkinkan mod mengganti berkas game, menggabungkan tabel Nex, dan mengubah tabel job, ability, serta item tanpa menyentuh berkas asli.",
+      "sourceUrl": "https://github.com/Nenkai/fftivc.utility.modloader",
+      "license": "MIT",
+      "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks"],
+      "settings": [
+        { "key": "DisableCustomCursors", "type": "bool", "label": "Matikan kursor khusus", "help": "Memakai kursor Windows biasa, bukan kursor bergaya game.", "default": false },
+        { "key": "MergeNexFileChanges", "type": "bool", "label": "Gabungkan perubahan tabel Nex", "help": "Biarkan menyala agar beberapa mod bisa mengubah tabel yang sama.", "default": true, "advanced": true },
+        { "key": "DisableAntiDebugger", "type": "bool", "label": "Netralkan anti-debug", "help": "Diperlukan untuk pengembangan mod. Biarkan menyala.", "default": true, "advanced": true },
+        { "key": "RemoveExceptionHandler", "type": "bool", "label": "Lepas penangan crash bawaan", "help": "Membuat laporan crash lebih berguna untuk pengembangan mod.", "default": true, "advanced": true },
+        { "key": "LogNexCellChanges", "type": "bool", "label": "Catat perubahan sel Nex", "help": "Menulis setiap perubahan tabel ke log. Hanya untuk pelacakan masalah.", "default": false, "advanced": true }
+      ]
+    },
+    {
+      "id": "fftivc.qol.turbo",
+      "name": "Improved Fast Forward",
+      "author": "masklovesmirror",
+      "role": "feature",
+      "category": "Kenyamanan",
+      "summary": "R1 menyalakan mode cepat 2x sampai 10x di pertarungan dan adegan.",
+      "details": "Menggantikan fast forward bawaan (tahan R1) dengan saklar: tekan R1 sekali untuk menyalakan, sekali lagi untuk mematikan. Penanda kecepatan muncul di pojok kanan atas. Peta dunia tetap memakai fast forward bawaan.",
+      "sourceUrl": "https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/192",
+      "license": "Tidak dinyatakan",
+      "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks"],
+      "settings": [
+        { "key": "TurboSpeed", "type": "integer", "label": "Kecepatan turbo", "help": "Pengali kecepatan saat mode cepat menyala.", "min": 2, "max": 10, "step": 1, "default": 4, "unit": "x" },
+        { "key": "DebugLog", "type": "bool", "label": "Log diagnostik", "help": "Menulis detail tambahan ke log. Hanya untuk pelacakan masalah.", "default": false, "advanced": true }
+      ]
+    },
+    {
+      "id": "fft.antiautorotate",
+      "name": "AntiAutoRotate",
+      "author": "wtfjajaja",
+      "role": "feature",
+      "category": "Kenyamanan",
+      "summary": "Kamera pertarungan tidak lagi berputar sendiri setelah aksi.",
+      "details": "Sudut kamera pilihan Anda dipertahankan setelah serangan, sihir, dan pergantian giliran. Kamera masih berayun sebentar selama animasi serangan lalu kembali; ini bisa memicu mabuk gerak pada pemain yang sensitif.",
+      "sourceUrl": "https://github.com/rexx-oss/FFT-AntiAutoRotate",
+      "license": "Tidak dinyatakan",
+      "requires": [],
+      "settings": []
+    },
+    {
+      "id": "fftivc.mechanics.globaljpboost",
+      "name": "Global JP Boost",
+      "author": "knightsong",
+      "role": "feature",
+      "category": "Progres",
+      "summary": "Pengali JP untuk semua unit, tanpa perlu memasang ability JP Boost.",
+      "details": "Mengalikan JP dari aksi dan JP limpahan. Nilai 1.5 setara ability JP Boost. Secara bawaan ability JP Boost dihapus dari semua job agar slot support bebas dipakai; unit yang sudah memasangnya tetap memilikinya.",
+      "sourceUrl": "https://github.com/knightsong/global-jp-boost",
+      "license": "GPL-3.0",
+      "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks", "fftivc.utility.modloader"],
+      "sharesHookWith": ["fftivc.mechanics.xpmultiplier"],
+      "settings": [
+        { "key": "JpMultiplier", "type": "number", "label": "Pengali JP", "help": "1.0 berarti normal. 1.5 setara ability JP Boost.", "min": 0, "max": 10, "step": 0.1, "default": 1.5, "unit": "x" },
+        { "key": "RemoveJpBoost", "type": "bool", "label": "Hapus ability JP Boost", "help": "Jika dimatikan, ability tetap ada dan efeknya bertumpuk dengan pengali.", "default": true }
+      ]
+    },
+    {
+      "id": "fftivc.mechanics.xpmultiplier",
+      "name": "XP Multiplier",
+      "author": "knightsong",
+      "role": "feature",
+      "category": "Progres",
+      "summary": "Pengali XP dan batas level untuk semua unit.",
+      "details": "Mengalikan XP yang didapat. Nilai 0 menghentikan XP tetapi JP tetap bertambah, berguna untuk melatih job tanpa menaikkan level. Batas level menghentikan XP setelah level tertentu.",
+      "sourceUrl": "https://github.com/knightsong/xp-multiplier",
+      "license": "GPL-3.0",
+      "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks", "fftivc.utility.modloader"],
+      "sharesHookWith": ["fftivc.mechanics.globaljpboost"],
+      "settings": [
+        { "key": "XpMultiplier", "type": "number", "label": "Pengali XP", "help": "1.0 berarti normal. 0 menghentikan XP.", "min": 0, "max": 100, "step": 0.5, "default": 1.0, "unit": "x" },
+        { "key": "LevelCap", "type": "integer", "label": "Batas level", "help": "Unit berhenti menerima XP setelah mencapai level ini.", "min": 1, "max": 99, "step": 1, "default": 99 }
+      ]
+    }
+  ]
+}

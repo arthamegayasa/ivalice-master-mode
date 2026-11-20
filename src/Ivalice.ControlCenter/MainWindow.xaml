@@ -1,0 +1,10 @@
+﻿<Window x:Class="Ivalice.ControlCenter.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Ivalice Control Center" Width="1240" Height="820" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen" Background="#12131C" Icon="app.ico">
+    <Grid>
+        <wv2:WebView2 x:Name="Web" DefaultBackgroundColor="#12131C" />
+    </Grid>
+</Window>

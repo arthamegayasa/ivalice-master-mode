@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'">
+  <title>Ivalice Control Center</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-art" aria-hidden="true"></div>
+    <div class="hero-body">
+      <div class="brand">
+        <img src="icon.png" alt="" width="56" height="56">
+        <div>
+          <h1>Ivalice Control Center</h1>
+          <p class="tagline">Semua mod Final Fantasy Tactics dalam satu tempat.</p>
+        </div>
+      </div>
+      <div class="hero-actions">
+        <button id="play" class="play" type="button">
+          <span class="play-label">Main</span>
+          <span class="play-sub" id="play-sub">Jalankan game dengan mod aktif</span>
+        </button>
+        <ul class="chips" id="chips"></ul>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" id="tab-mods" aria-controls="view-mods" aria-selected="true" type="button">Mod</button>
+    <button role="tab" id="tab-log" aria-controls="view-log" aria-selected="false" type="button">Log</button>
+    <span class="tabs-spacer"></span>
+    <button class="link" id="open-mods" type="button">Buka folder mod</button>
+    <button class="link" id="open-reloaded" type="button">Buka Reloaded-II</button>
+  </nav>
+
+  <main>
+    <div id="notices" class="notices" aria-live="polite"></div>
+
+    <section id="view-mods" role="tabpanel" aria-labelledby="tab-mods"></section>
+
+    <section id="view-log" role="tabpanel" aria-labelledby="tab-log" hidden>
+      <div class="log-head">
+        <div id="log-summary" class="log-summary"></div>
+        <div class="log-actions">
+          <button class="ghost" id="log-refresh" type="button">Muat ulang</button>
+          <button class="ghost" id="open-logs" type="button">Buka folder log</button>
+        </div>
+      </div>
+      <div id="log-problems"></div>
+      <pre id="log-lines" class="log-lines" tabindex="0"></pre>
+    </section>
+  </main>
+
+  <footer>
+    <span id="footer-note">Perubahan berlaku saat game dijalankan berikutnya.</span>
+    <span id="version"></span>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
