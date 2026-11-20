@@ -19,6 +19,17 @@ One place to install, watch and tune mods for **FINAL FANTASY TACTICS - The Ival
 
 The app changes the same files Reloaded-II reads, so Reloaded-II's own launcher keeps working alongside it. Changes apply the next time the game starts.
 
+## Smart Auto Battle
+
+This project's own mod. When a fight starts, your units act on their own using the game's built-in auto-battle, with the mode chosen by role:
+
+- a unit with a healing skillset (White Magicks or Items by default) saves an ally who is knocked out or below the heal threshold;
+- everyone else, and healers when nobody needs help, fights.
+
+Press **F8** or click both sticks (**L3 + R3**) to switch it off and on during play; a high beep means on, a low beep means off. A mode you pick yourself in the game's Auto-battle menu is left alone, and guests and enemies are never touched. The heal threshold and which skillsets count as healers are set in the Control Center.
+
+**Status: not yet tested in a battle.** The mod loads, finds its hook and leaves the game stable at the title screen, and its decision logic is covered by tests, but nobody has played a fight with it. Save first, and try it in a random battle before a story battle. [How it works](docs/smart-auto-battle.md) lists the evidence and what is still unconfirmed.
+
 ## Mods in the catalog
 
 | Mod | Author | What it does | Licence |
@@ -28,10 +39,11 @@ The app changes the same files Reloaded-II reads, so Reloaded-II's own launcher 
 | [AntiAutoRotate](https://github.com/rexx-oss/FFT-AntiAutoRotate) | wtfjajaja | Stops the battle camera rotating on its own | Not stated |
 | [Global JP Boost](https://github.com/knightsong/global-jp-boost) | knightsong | JP multiplier for every unit | GPL-3.0 |
 | [XP Multiplier](https://github.com/knightsong/xp-multiplier) | knightsong | XP multiplier and level cap | GPL-3.0 |
+| Smart Auto Battle | this project | Units fight on their own, healers heal | MIT |
 
 Two Reloaded-II libraries (Signature Scanner and Shared Hooks) are installed as dependencies. Any other mod you drop into the Reloaded-II `Mods` folder also shows up in the app, with an on/off switch.
 
-**This repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source, and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
+**Apart from Smart Auto Battle, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source, and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
 
 ## Install
 
@@ -54,10 +66,6 @@ The script is safe to run again; it skips what is already installed. Useful para
 
 To remove everything, delete the Reloaded-II folder, `%APPDATA%\Reloaded-Mod-Loader-II`, and the desktop shortcut. Nothing in the game folder is replaced; Reloaded-II adds one small file there, `steam_appid.txt`, so the game can start outside the Steam client.
 
-## Roadmap
-
-- **v0.2: Smart Auto Battle.** A mod that switches auto battle on when a fight starts and picks actions by role: healers heal allies below a health threshold, attackers attack. This needs reverse engineering of the game's battle code and is not built yet.
-
 See [CHANGELOG.md](CHANGELOG.md) for what has shipped.
 
 ## Adding a mod to the catalog
@@ -68,10 +76,13 @@ Edit [`catalog/mods.json`](catalog/mods.json). Each entry gives the Reloaded-II 
 
 ```powershell
 dotnet test tests/Ivalice.Core.Tests
+dotnet test tests/Ivalice.Battle.Tests
 dotnet build src/Ivalice.ControlCenter -c Release
 ```
 
 - `src/Ivalice.Core`: reads and changes a Reloaded-II profile (enabled mods, settings, diagnostics, log summary). Covered by tests.
+- `src/Ivalice.Battle`: the auto-battle decision logic, as a pure function over a copy of the game's unit table. Covered by tests.
+- `mods/ivalice.battle.smartautobattle`: the Reloaded-II mod that hooks the game and applies those decisions. Set `RELOADEDIIMODS` to your Reloaded-II `Mods` folder before building it.
 - `src/Ivalice.ControlCenter`: a WPF window hosting the HTML interface in `ui/` through WebView2, plus launching the game. Checked by hand, not by tests.
 - `catalog/mods.json`: the curated mod descriptions.
 

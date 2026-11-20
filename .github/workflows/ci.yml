@@ -20,4 +20,9 @@ jobs:
         with:
           dotnet-version: 9.0.x
       - run: dotnet test tests/Ivalice.Core.Tests --nologo
+      - run: dotnet test tests/Ivalice.Battle.Tests --nologo
       - run: dotnet build src/Ivalice.ControlCenter -c Release --nologo
+      - name: Build Smart Auto Battle
+        run: dotnet build mods/ivalice.battle.smartautobattle -c Release --nologo
+        env:
+          RELOADEDIIMODS: ${{ runner.temp }}\mods

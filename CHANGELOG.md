@@ -2,6 +2,31 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-11-20
+
+Pre-release: Smart Auto Battle has not been tested inside a battle yet.
+
+### Added
+
+- **Smart Auto Battle** (`ivalice.battle.smartautobattle`), a Reloaded-II mod that hands the player's units to the game's own auto-battle:
+  - healers (White Magicks or Items users by default) switch to Save Fading Life when an ally is knocked out or below the heal threshold;
+  - every other unit, and healers with nobody to help, use Fight for Life;
+  - F8 or L3 + R3 toggles it during play, with a beep;
+  - modes picked in the in-game Auto-battle menu, guests and enemies are left alone.
+- Control Center: a "Pertarungan" group with Smart Auto Battle's settings (active at start, heal threshold, which skillsets are healers, toggle options).
+- The install script builds and installs Smart Auto Battle.
+- [docs/smart-auto-battle.md](docs/smart-auto-battle.md): how the mod works and the disassembly evidence behind it.
+
+### Verified
+
+- The mod loads in the game, resolves the battle unit table and installs its hook at the addresses found by static analysis; the game stayed responsive at the title screen for 60 seconds.
+- 23 tests cover the decision logic; the hook patterns each match exactly once in the executable.
+
+### Not verified
+
+- Any behaviour inside a battle: units acting on their own, healers healing, toggling, story battles with guests, suspend saves.
+- The names of the game's auto-battle modes are inferred from the original game's menu order.
+
 ## [0.1.0] - 2026-11-20
 
 First release.
@@ -29,4 +54,5 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
+[0.2.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.0
 [0.1.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.1.0

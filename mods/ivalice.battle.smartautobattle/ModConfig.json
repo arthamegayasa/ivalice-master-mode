@@ -1,0 +1,21 @@
+{
+  "ModId": "ivalice.battle.smartautobattle",
+  "ModName": "Smart Auto Battle",
+  "ModAuthor": "arthamegayasa",
+  "ModVersion": "0.2.0",
+  "ModDescription": "Switches your units to the game's own auto-battle when a fight starts and picks the mode by role: healers save fading allies, everyone else fights. Toggle with F8 or L3+R3.",
+  "ModDll": "ivalice.battle.smartautobattle.dll",
+  "ModIcon": "Preview.png",
+  "ModR2RManagedDll32": "",
+  "ModR2RManagedDll64": "",
+  "ModNativeDll32": "",
+  "ModNativeDll64": "",
+  "IsLibrary": false,
+  "ReleaseMetadataFileName": "ivalice.battle.smartautobattle.ReleaseMetadata.json",
+  "PluginData": {},
+  "IsUniversalMod": false,
+  "ModDependencies": [ "Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks" ],
+  "OptionalDependencies": [],
+  "SupportedAppId": [ "fft_enhanced.exe" ],
+  "ProjectUrl": "https://github.com/arthamegayasa/ivalice-master-mode"
+}

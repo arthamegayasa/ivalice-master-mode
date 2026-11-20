@@ -113,6 +113,29 @@
         { "key": "XpMultiplier", "type": "number", "label": "Pengali XP", "help": "1.0 berarti normal. 0 menghentikan XP.", "min": 0, "max": 100, "step": 0.5, "default": 1.0, "unit": "x" },
         { "key": "LevelCap", "type": "integer", "label": "Batas level", "help": "Unit berhenti menerima XP setelah mencapai level ini.", "min": 1, "max": 99, "step": 1, "default": 99 }
       ]
+    },
+    {
+      "id": "ivalice.battle.smartautobattle",
+      "name": "Smart Auto Battle",
+      "author": "arthamegayasa",
+      "role": "feature",
+      "category": "Pertarungan",
+      "summary": "Unit Anda bertarung sendiri sejak awal pertarungan: penyembuh menolong teman yang sekarat, yang lain menyerang.",
+      "details": "Memakai auto battle bawaan game, tanpa perlu membuka menu tiap unit. Unit dengan skillset penyembuh beralih ke mode Save Fading Life saat ada teman yang tumbang atau HP-nya di bawah ambang; selain itu semua unit memakai mode Fight for Life. Tekan F8 atau klik kedua stik (L3 + R3) untuk menyalakan dan mematikannya kapan saja; nada tinggi berarti nyala, nada rendah berarti mati. Mode yang Anda pilih sendiri lewat menu Auto-battle di game tidak diubah. Unit tamu dan musuh tidak disentuh.",
+      "sourceUrl": "https://github.com/arthamegayasa/ivalice-master-mode",
+      "license": "MIT",
+      "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks"],
+      "settings": [
+        { "key": "ActiveAtStart", "type": "bool", "label": "Aktif sejak game dimulai", "help": "Jika mati, auto battle baru berjalan setelah Anda menekan F8 atau L3 + R3.", "default": true },
+        { "key": "HealThresholdPercent", "type": "integer", "label": "Ambang HP untuk menyembuhkan", "help": "Penyembuh berhenti menyerang dan menolong teman yang HP-nya di bawah persentase ini. Logika penyembuhan game sendiri baru bereaksi di bawah 50%.", "min": 10, "max": 50, "step": 5, "default": 50, "unit": "%" },
+        { "key": "HealWithWhiteMagicks", "type": "bool", "label": "Pengguna White Magicks adalah penyembuh", "help": "Berlaku untuk skillset utama maupun kedua.", "default": true },
+        { "key": "HealWithItems", "type": "bool", "label": "Pengguna Items adalah penyembuh", "help": "Berlaku untuk skillset utama maupun kedua.", "default": true },
+        { "key": "HealWithMartialArts", "type": "bool", "label": "Pengguna Martial Arts adalah penyembuh", "help": "Untuk Monk dengan Chakra dan Revive.", "default": false },
+        { "key": "ToggleWithF8", "type": "bool", "label": "Saklar dengan F8", "help": "Tekan F8 saat jendela game aktif.", "default": true, "advanced": true },
+        { "key": "ToggleWithSticks", "type": "bool", "label": "Saklar dengan kedua stik", "help": "Klik stik kiri dan kanan bersamaan (L3 + R3).", "default": true, "advanced": true },
+        { "key": "SoundOnToggle", "type": "bool", "label": "Bunyi saat saklar ditekan", "help": "Nada tinggi saat nyala, nada rendah saat mati.", "default": true, "advanced": true },
+        { "key": "DebugLog", "type": "bool", "label": "Log diagnostik", "help": "Mencatat setiap perintah yang diberikan mod ke log. Hanya untuk pelacakan masalah.", "default": false, "advanced": true }
+      ]
     }
   ]
 }

@@ -172,6 +172,15 @@ try {
         Write-Host "   $($item.Id): built and installed"
     }
 
+    Write-Step 'Smart Auto Battle (this repository)'
+    $ownMod = 'ivalice.battle.smartautobattle'
+    $alreadyThere = Test-Path (Join-Path $modsDir $ownMod)
+    & $dotnet build (Join-Path $repo "mods\$ownMod") -c Release --nologo -v q | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Building Smart Auto Battle failed. Close the game if it is running and try again.' }
+    if (-not (Test-Path (Join-Path $modsDir "$ownMod\ModConfig.json"))) { throw "Smart Auto Battle was built but is missing from $modsDir." }
+    if (-not $alreadyThere) { $newlyInstalled.Add($ownMod) }
+    Write-Host "   ${ownMod}: built and installed"
+
     Write-Step 'Mods you download yourself (no redistribution licence)'
     $manual = @(
         @{ Id = 'fftivc.qol.turbo'; Pattern = '*Fast Forward*'; Url = 'https://www.nexusmods.com/finalfantasytacticstheivalicechronicles/mods/192' },
