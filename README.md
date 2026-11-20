@@ -17,6 +17,7 @@ One place to install, watch and tune mods for **FINAL FANTASY TACTICS - The Ival
 - Launches the game with the enabled mods.
 - Shows the latest session log and picks out the lines worth checking.
 - Lists the party of the running game and reincarnates characters (see Reincarnation below).
+- Edits stat growth and stat multipliers per job and per character (see Stat Tuning below).
 
 The app changes the same files Reloaded-II reads, so Reloaded-II's own launcher keeps working alongside it. Changes to mods and settings apply the next time the game starts.
 
@@ -45,6 +46,18 @@ The tab lists the party with each character's stats, reincarnation count and Pow
 
 **Status: run in the game on one save.** A character was reincarnated from the Control Center on the world map; the game showed it at level 1 at once and the next autosave held the change. A battle fought by a reincarnated character has not been played through. [How it works](docs/reincarnation.md) has the evidence and the open points.
 
+## Stat Tuning
+
+The **Stat** tab changes how fast stats grow on a level-up (growth) and how much of a raw stat the game uses (multiplier), for HP, MP, Speed, PA and MA:
+
+- per job, as replacement values shown next to the game's own;
+- per character, as percentages on top of whatever job the character has;
+- for your units only: enemies with the same job keep the game's values unless you switch that on.
+
+Rules saved while the game runs are picked up within a second and apply from the next battle, or the next time the Units screen opens. A multiplier shows at once; a growth only affects level-ups from then on. The game's job table is never changed, so switching the mod off undoes the multipliers; raw stats already raised by a faster growth stay in the save.
+
+**Status: run in the game on one save.** The Units screen, two battles, level-ups under a changed growth and the enemy filter matched the arithmetic. [How it works](docs/stat-tuning.md) has the evidence and the open points.
+
 ## Mods in the catalog
 
 | Mod | Author | What it does | Licence |
@@ -56,10 +69,11 @@ The tab lists the party with each character's stats, reincarnation count and Pow
 | [XP Multiplier](https://github.com/knightsong/xp-multiplier) | knightsong | XP multiplier and level cap | GPL-3.0 |
 | Smart Auto Battle | this project | Units fight on their own, healers heal | MIT |
 | Reincarnation | this project | Level 10+ characters restart at level 1 with better starting stats | MIT |
+| Stat Tuning | this project | Stat growth and multipliers per job and per character, for your units only | MIT |
 
 Two Reloaded-II libraries (Signature Scanner and Shared Hooks) are installed as dependencies. Any other mod you drop into the Reloaded-II `Mods` folder also shows up in the app, with an on/off switch.
 
-**Apart from Smart Auto Battle and Reincarnation, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source with a small patch from [`patches/`](patches) (so their multipliers apply to your side only, not to enemies), and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
+**Apart from Smart Auto Battle, Reincarnation and Stat Tuning, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source with a small patch from [`patches/`](patches) (so their multipliers apply to your side only, not to enemies), and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
 
 ## Install
 
@@ -102,6 +116,7 @@ dotnet build src/Ivalice.ControlCenter -c Release
 - `mods/ivalice.battle.smartautobattle`: the Reloaded-II mod that hooks the game and applies those decisions. Set `RELOADEDIIMODS` to your Reloaded-II `Mods` folder before building it.
 - `src/Ivalice.Party`: the reincarnation rules, as pure functions over a copy of the game's party roster, plus the file formats the mod and the app exchange. Covered by tests.
 - `mods/ivalice.party.reincarnation`: the Reloaded-II mod that finds the roster, hooks the game's per-frame routine and answers the app's commands. Its hook stub, register probe and file handling are tested in `tests/Ivalice.Party.Tests`. Build it with `RELOADEDIIMODS` set, as above; point it at a scratch folder to build without installing.
+- `mods/ivalice.party.stattuning`: the Reloaded-II mod that rewrites the growth and multiplier bytes the game copies into each unit, from rules in `src/Ivalice.Party/StatTuning.cs`.
 - `src/Ivalice.ControlCenter`: a WPF window hosting the HTML interface in `ui/` through WebView2, plus launching the game, backing up saves and sending reincarnation commands. Checked by hand, not by tests.
 - `catalog/mods.json`: the curated mod descriptions.
 

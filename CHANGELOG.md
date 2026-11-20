@@ -2,6 +2,38 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-11-21
+
+### Added
+
+- **Stat Tuning** (`ivalice.party.stattuning`), a Reloaded-II mod, and a **Stat** tab in Ivalice Control Center to drive it:
+  - per job: replacement growth constants and stat multipliers for HP, MP, Speed, PA and MA, shown next to the game's own values;
+  - per character: percentages on top of whatever the character's current job gives, which follow the character from job to job;
+  - only the player's units are changed; enemies with the same job keep the game's values unless "Aturan job berlaku juga untuk musuh" is switched on;
+  - rules saved while the game runs are picked up within a second and apply to units built afterwards (the next battle, or the next time a menu shows a unit);
+  - the game's job table is never written: the mod rewrites the copy of the ten bytes the game puts into each unit, right after the game makes it.
+- `src/Ivalice.Party/StatTuning.cs`: the rules, their file format and which rules a battle unit gets.
+- The install script builds and installs Stat Tuning; CI runs its tests and builds it.
+- [docs/stat-tuning.md](docs/stat-tuning.md): what the numbers mean, how the mod works, the evidence and the limits.
+
+### Verified
+
+- 25 new tests cover the rules (job and character rules, stacking, rounding, the enemy filter, tolerant parsing, the write and read round trip), unit recognition, the job export, and the hook stub's register preservation and stack alignment. The Party test project now has 214 tests.
+- Both copy-site patterns match exactly once in `FFT_enhanced.exe`.
+
+### Confirmed in play
+
+- On one Chapter 1 save with all eight mods loaded: self-test passed, both sites hooked, two battles played through without a crash.
+- Units screen: Ramza's HP went from 62 to 111 with his job's HP multiplier doubled, and to 86 with a character rule of 150% saved from the Control Center while the game ran; both match the arithmetic.
+- Level-ups in battle, read from the game's memory: with Squire HP growth 11 → 1 a level 5 unit gained exactly `raw / 6`; Ramza, left at 11, gained exactly `raw / 16`.
+- Enemy Chocobos kept the game's HP multiplier while a rule for their job was active.
+
+### Not verified
+
+- The switch that extends job rules to enemies, in the game (tests only).
+- Story battles, guests, special jobs other than Ramza's, a job change during battle, and loading a save made after tuned level-ups.
+- The game's second, roster-side level-up routine (`0x278B24`) is not covered by the mod; what triggers it was not determined.
+
 ## [0.4.0] - 2026-11-21
 
 ### Added
@@ -162,6 +194,7 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
+[0.5.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.5.0
 [0.4.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.4.0
 [0.3.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.3.0
 [0.2.1]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.1

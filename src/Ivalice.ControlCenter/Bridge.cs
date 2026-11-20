@@ -17,6 +17,7 @@ public sealed class Bridge
 {
     private const string GameProcess = "FFT_enhanced";
     private const string ReincarnationMod = "ivalice.party.reincarnation";
+    private const string StatTuningMod = "ivalice.party.stattuning";
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -26,6 +27,7 @@ public sealed class Bridge
 
     private readonly Catalog _catalog = Catalog.Load(Path.Combine(AppContext.BaseDirectory, "catalog", "mods.json"));
     private readonly BridgePaths _paths = BridgePaths.Default;
+    private readonly StatTuningPaths _statPaths = StatTuningPaths.Default;
 
     public string Handle(string requestJson)
     {
@@ -88,6 +90,12 @@ public sealed class Bridge
 
             case "cancelReincarnation":
                 return CancelReincarnation(args["commandId"]!.GetValue<string>());
+
+            case "getStatTuning":
+                return ReadStatTuning();
+
+            case "saveStatTuning":
+                return SaveStatTuning(args["rules"]);
 
             case "open":
                 Open(args["target"]!.GetValue<string>(), args["value"]?.GetValue<string>());
@@ -241,6 +249,91 @@ public sealed class Bridge
         {
             return new { cancelled = false };
         }
+    }
+
+    // ---- Stat Tuning: rules.json is written here and read by the mod; jobs.json comes from the mod ----
+
+    private object ReadStatTuning()
+    {
+        var layout = ReloadedLayout.TryLoad();
+        var mod = layout is null ? null
+            : new ModManager(layout, _catalog).GetState().Mods.FirstOrDefault(m => m.Id == StatTuningMod);
+        var status = mod is null || !mod.Installed ? "modNotInstalled" : !mod.Enabled ? "modDisabled" : "ok";
+
+        var rulesText = ReadTextOrNull(_statPaths.RulesFile);
+        var rules = StatTuningRules.Parse(rulesText);
+        var processIds = GameProcessIds();
+
+        // The party comes from the Reincarnation mod's feed; without it, characters already in the rules can still be edited.
+        var party = new List<object>();
+        if (processIds.Count > 0)
+        {
+            var reading = RosterFeed.Evaluate(ReadTextOrNull(_paths.RosterFile), DateTimeOffset.UtcNow, processIds);
+            if (reading.Status is FeedStatus.Ok or FeedStatus.Stale)
+                party.AddRange(reading.Roster!.Units.Select(u => (object)new { u.Fingerprint, u.Name, u.JobId, u.JobName, u.Level, u.Slot }));
+        }
+
+        return new
+        {
+            status,
+            gameRunning = processIds.Count > 0,
+            jobs = ReadJobs(),
+            rules = JsonNode.Parse((rules ?? StatTuningRules.Empty).Serialize()),
+            rulesUnreadable = rulesText is not null && rules is null,
+            party,
+            limits = new
+            {
+                minValue = StatTuningRules.MinByte, maxValue = StatTuningRules.MaxByte,
+                minPercent = StatTuningRules.MinPercent, maxPercent = StatTuningRules.MaxPercent,
+            },
+            rulesFile = _statPaths.RulesFile,
+        };
+    }
+
+    /// <summary>The game's own job values as the mod last wrote them, with names; empty until the game ran once with the mod.</summary>
+    private List<object> ReadJobs()
+    {
+        var jobs = new List<object>();
+        var text = ReadTextOrNull(_statPaths.JobsFile);
+        if (text is null) return jobs;
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            foreach (var entry in document.RootElement.GetProperty("jobs").EnumerateArray())
+            {
+                var id = entry.GetProperty("job").GetInt32();
+                var growth = entry.GetProperty("growth").EnumerateArray().Select(v => v.GetInt32()).ToArray();
+                var multiplier = entry.GetProperty("multiplier").EnumerateArray().Select(v => v.GetInt32()).ToArray();
+                // Rows without a name or without values are unused by the game.
+                if (JobNames.Find(id) is not { } name || multiplier.All(v => v == 0)) continue;
+                var group = id < 0x4A ? "special" : id <= 0x5D ? "generic" : "monster";
+                jobs.Add(new { job = id, name, group, growth, multiplier });
+            }
+        }
+        catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            jobs.Clear();
+        }
+        return jobs;
+    }
+
+    private object SaveStatTuning(JsonNode? rules)
+    {
+        var parsed = StatTuningRules.Parse(rules?.ToJsonString())
+            ?? throw new ModOperationException("Aturan tidak bisa dibaca, jadi tidak disimpan.");
+        try
+        {
+            Directory.CreateDirectory(_statPaths.Root);
+            // Written under another name first, so the mod never reads half a file.
+            var temporary = _statPaths.RulesFile + ".tmp";
+            File.WriteAllText(temporary, parsed.Serialize());
+            File.Move(temporary, _statPaths.RulesFile, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            throw new ModOperationException("Aturan tidak bisa disimpan: " + e.Message);
+        }
+        return ReadStatTuning();
     }
 
     private static Guid ParseCommandId(string commandId) =>

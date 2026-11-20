@@ -198,6 +198,34 @@ details .settings { border-top: 0; background: none; padding-top: 2px; }
 }
 .confirm:hover:not(:disabled) { filter: brightness(1.08); }
 .confirm:disabled { cursor: default; background: #4a4636; color: #cfc6ab; box-shadow: none; }
+.stat-layout { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); align-items: start; margin-bottom: 12px; }
+.stat-layout > * { min-width: 0; }
+.stat-card { padding: 14px 16px 15px; margin-bottom: 12px; }
+.stat-layout .stat-card { margin-bottom: 0; }
+.stat-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.stat-card-head h3 { margin: 0; font: 600 16px/1.3 var(--serif); }
+.setting-reset { border: 0; background: none; color: var(--muted); padding: 0; font-size: 12px; text-decoration: underline; }
+.setting-reset:hover { color: var(--text); }
+.stat-help { color: var(--muted); font-size: 12.5px; margin: 4px 0 10px; user-select: text; font-weight: 400; }
+.stat-select { width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); font: inherit; }
+.stat-select option, .stat-select optgroup { background: var(--panel); color: var(--text); }
+.stat-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13.5px; }
+.stat-table th, .stat-table td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+.stat-table thead th { color: var(--muted); font: 600 11.5px var(--sans); letter-spacing: .03em; }
+.stat-table thead th.num { font-family: var(--sans); }
+.stat-table thead th.group { color: var(--text); border-bottom: 0; padding-bottom: 0; }
+.stat-table tbody th { font-weight: 600; white-space: nowrap; }
+.stat-table tbody tr:last-child th, .stat-table tbody tr:last-child td { border-bottom: 0; }
+.stat-table .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stat-table .muted, .stat-summary .muted { color: var(--muted); }
+.stat-input { width: 76px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); font: 600 13.5px var(--mono); }
+.stat-input::placeholder { color: var(--muted); font-weight: 400; }
+.stat-input.changed { border-color: var(--gold); color: var(--gold); }
+.stat-input:focus-visible, .stat-select:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.stat-check { display: flex; gap: 10px; align-items: flex-start; }
+.stat-check input { margin-top: 3px; accent-color: var(--gold); }
+.stat-summary { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; user-select: text; }
+.stat-summary li { margin: 3px 0; }
 .reinc-foot { margin: 14px 0 0; color: var(--muted); font-size: 12.5px; user-select: text; }
 
 dialog {
