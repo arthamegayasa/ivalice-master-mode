@@ -23,7 +23,8 @@ All notable changes to this project are recorded here. Versions follow [Semantic
 
 ### Verified
 
-- 186 tests cover the rules, the stamp, eligibility, the battle checks, the roster export, the command processor and the mod's file handling, including records copied from a real save. Eleven deliberate rule breaks (battle check removed, fingerprint ignored, game written before the journal, and others) each made tests fail.
+- An independent review (GPT 6.2 Astra) confirmed the battle-record offsets against the game's code; its findings are fixed: the change is mirrored into every battle copy of the unit, a simulated command stays a simulation, the mod takes ownership of a command before reading it and never repeats an id, a failed save backup leaves no partial folder, and a timeout no longer claims nothing changed.
+- 189 tests cover the rules, the stamp, eligibility, the battle checks, the roster export, the command processor and the mod's file handling, including records copied from a real save. Eleven deliberate rule breaks (battle check removed, fingerprint ignored, game written before the journal, and others) each made tests fail.
 - The mod's hook stub, assembled and installed by Reloaded.Hooks on a throwaway native function, hands back `rax`, `rcx`, `rdx`, `r8` to `r11` and `xmm0` to `xmm5` unchanged after running managed code; a stub that calls managed code without saving registers is caught by the same test.
 - Each of the nine byte patterns the mod uses matches exactly once in the code section of `FFT_enhanced.exe` 1.00.
 - The game's battle-to-roster write-back and the party menu's write-back were read in the disassembly: neither writes the spare bytes the stamp uses.

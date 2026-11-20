@@ -56,6 +56,26 @@ public static class BattleBinding
         record.Slice(RosterLayout.RawStats, RawStatsLength).CopyTo(unit.Slice(BattleRawStats, RawStatsLength));
     }
 
+    /// <summary>
+    /// Mirrors a roster record into every battle record built from that roster slot. The game picks the
+    /// record to write back by unit id and prefers an active one, so with two records for the same slot
+    /// it is not the mod's place to guess which: all of them get the same values.
+    /// </summary>
+    /// <returns>How many battle records were updated.</returns>
+    public static int MirrorAll(Span<byte> battleTable, int rosterSlot, ReadOnlySpan<byte> record)
+    {
+        if (battleTable.Length != TableSize) return 0;
+        var updated = 0;
+        for (var index = 0; index < Capacity; index++)
+        {
+            var unit = battleTable.Slice(index * Stride, Stride);
+            if (unit[RosterSlot] != rosterSlot || unit[UnitId] == 0) continue;
+            Mirror(battleTable, index, record);
+            updated++;
+        }
+        return updated;
+    }
+
     public static int CountInUse(ReadOnlySpan<byte> battleTable) => Count(battleTable, unit => unit[InUse] != Empty);
 
     /// <summary>How many battle records the game would still write back into some roster slot.</summary>

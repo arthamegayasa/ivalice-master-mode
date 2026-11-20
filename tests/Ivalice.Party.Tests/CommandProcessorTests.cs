@@ -262,6 +262,45 @@ public class CommandProcessorTests
     }
 
     [Fact]
+    public void Every_battle_copy_of_the_unit_receives_the_change_not_just_the_first()
+    {
+        var session = new Session { BattleTable = Fake.BattleTableWith(battleSlot: 3, rosterSlot: 1, inUse: 0xFF, onField: 0) };
+        // A second record for the same roster slot, as left by a later battle: active this time.
+        var second = Fake.BattleTableWith(battleSlot: 9, rosterSlot: 1, inUse: 0, onField: 1);
+        second.AsSpan(9 * BattleBinding.Stride, BattleBinding.Stride).CopyTo(session.BattleTable.AsSpan(9 * BattleBinding.Stride));
+        foreach (var index in new[] { 3, 9 }) session.BattleTable[index * BattleBinding.Stride + 0x29] = 30;
+
+        Assert.True(session.Run(session.Command(slot: 1)).Applied);
+
+        Assert.Equal(1, session.BattleTable[3 * BattleBinding.Stride + 0x29]);
+        Assert.Equal(1, session.BattleTable[9 * BattleBinding.Stride + 0x29]);
+    }
+
+    [Fact]
+    public void A_command_marked_as_a_simulation_never_changes_the_game_even_with_safe_mode_off()
+    {
+        var session = new Session { SafeMode = false };
+        var before = session.Record(1).ToArray();
+
+        var result = session.Run(session.Command(slot: 1) with { Simulate = true });
+
+        Assert.Equal((true, false, true), (result.Ok, result.Applied, result.SafeMode));
+        Assert.Equal(before, session.Record(1).ToArray());
+        Assert.Empty(session.Journal);
+    }
+
+    [Fact]
+    public void The_simulate_flag_is_read_from_the_command_file_and_must_be_a_boolean()
+    {
+        var id = Guid.NewGuid();
+        var text = $$"""{ "id": "{{id}}", "action": "reincarnate", "slot": 1, "simulate": true }""";
+
+        Assert.True(CommandProcessor.Parse(text).Command!.Simulate);
+        Assert.False(CommandProcessor.Parse(text.Replace(", \"simulate\": true", "")).Command!.Simulate);
+        Assert.Equal(Refusal.Malformed, CommandProcessor.Parse(text.Replace("true", "\"yes\"")).Refusal);
+    }
+
+    [Fact]
     public void Safe_mode_leaves_a_leftover_battle_copy_alone()
     {
         var session = new Session { SafeMode = true, BattleTable = Fake.BattleTableWith(battleSlot: 3, rosterSlot: 1, inUse: 0xFF, onField: 0) };

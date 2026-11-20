@@ -41,8 +41,16 @@ public static class CommandProcessor
                 expectedLevel = levelNumber;
             }
 
+            var simulate = false;
+            if (root.TryGetProperty("simulate", out var simulateValue) && simulateValue.ValueKind != JsonValueKind.Null)
+            {
+                if (simulateValue.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                    return new ParsedCommand(id, null, Refusal.Malformed);
+                simulate = simulateValue.GetBoolean();
+            }
+
             return new ParsedCommand(id, new ReincarnationCommand(id.Value.ToString("D"), action, slotNumber,
-                Text(root, "expectedFingerprint"), expectedLevel, Text(root, "createdAt")), Refusal.None);
+                Text(root, "expectedFingerprint"), expectedLevel, Text(root, "createdAt"), simulate), Refusal.None);
         }
         catch (JsonException)
         {
@@ -67,6 +75,10 @@ public static class CommandProcessor
         ReadOnlySpan<byte> jobTable, GameStatus game, DateTimeOffset now, DateTimeOffset fileTime, bool safeMode,
         Func<JournalEntry, bool> journal, NameResolver? names = null)
     {
+        // The player confirmed either a real change or a simulation; a simulation stays one even if
+        // safe mode was switched off while the command was waiting.
+        safeMode |= command.Simulate;
+
         Guid? id = Guid.TryParse(command.Id, out var parsed) ? parsed : null;
         if (id is null) return Refuse(null, Refusal.Malformed, safeMode, now);
         if (command.Action != ReincarnationCommand.Reincarnate) return Refuse(id, Refusal.UnknownAction, safeMode, now);
@@ -111,8 +123,7 @@ public static class CommandProcessor
         if (!journaled) return Refuse(id, Refusal.JournalFailed, safeMode, now, RosterExport.Describe(live, command.Slot, battleTable, jobTable, game, names));
 
         after.CopyTo(live);
-        var staleBattleCopy = BattleBinding.Find(battleTable, command.Slot);
-        if (staleBattleCopy >= 0) BattleBinding.Mirror(battleTable, staleBattleCopy, live);
+        BattleBinding.MirrorAll(battleTable, command.Slot, live);
         return new CommandResult(command.Id, Ok: true, Applied: true, SafeMode: false, Refusal.None.Code(),
             $"Reincarnated: level {plan.LevelBefore} to 1, Power +{plan.GainPermille / 10.0:0.0}% (total {plan.Stamp.PowerPermille / 10.0:0.0}%).",
             RosterExport.Describe(live, command.Slot, battleTable, jobTable, game, names), Stamp(now));

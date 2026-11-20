@@ -145,6 +145,10 @@ Before the Control Center sends a command it copies every `.png` under `Document
 - Saved: close the game and copy the files of the matching folder in `save-backups` back over the save folder.
 - By hand: the journal line holds the record as it was. Writing those 600 bytes back at `roster + slot * 0x258` restores the unit exactly, stamp included.
 
+One caveat when undoing by hand: if the unit still has a battle copy left over from a fight, that copy was given the new level, experience and raw stats too, and the game may write it back over the roster later. Restoring only the roster record is then not enough. The reliable way to undo is to load a save from before the reincarnation; the Control Center backs the save files up before every command.
+
+A command is carried out at most once per game session (the mod remembers the ids it answered), and once the mod has taken a command the Control Center can no longer withdraw it. If the answer never arrives, the app says so instead of claiming nothing changed.
+
 ## Evidence
 
 | What | Where | Observed |

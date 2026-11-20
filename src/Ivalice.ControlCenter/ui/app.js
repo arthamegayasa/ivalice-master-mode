@@ -437,7 +437,10 @@ function askReincarnation(unit) {
 async function sendReincarnation(unit) {
   const title = unitTitle(unit);
   try {
-    const sent = await call("reincarnate", { slot: unit.slot, fingerprint: unit.fingerprint, level: unit.level });
+    // The dialog told the player whether this is a simulation; the command carries that promise.
+    const sent = await call("reincarnate", {
+      slot: unit.slot, fingerprint: unit.fingerprint, level: unit.level, simulate: reinc.roster.safeMode === true,
+    });
     reincBusy = { commandId: sent.commandId, title, startedAt: Date.now() };
     renderReinc(true);
     pollReincarnation();
@@ -492,7 +495,8 @@ async function pollReincarnation() {
       const taken = await call("cancelReincarnation", { commandId: busy.commandId });
       const late = taken.cancelled ? { done: false } : await call("getReincarnationResult", { commandId: busy.commandId });
       if (late.done) { reincBusy = null; showReincarnationResult(busy, late.result); loadRoster(true); }
-      else finish(`Game tidak menjawab; perintah untuk ${busy.title} ditarik kembali. Tidak ada yang diubah.`, false);
+      else if (taken.cancelled) finish(`Game tidak menjawab; perintah untuk ${busy.title} ditarik kembali. Tidak ada yang diubah.`, false);
+      else finish(`Game sudah mengambil perintah untuk ${busy.title} tetapi jawabannya tidak sampai. Periksa level karakter itu di daftar ini atau di game sebelum mencoba lagi.`, false);
       return;
     }
   } catch (error) {

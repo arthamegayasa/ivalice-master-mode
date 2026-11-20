@@ -29,11 +29,12 @@ public static class SaveBackup
         if (!Directory.Exists(saveDirectory))
             throw new ModOperationException("Folder save game tidak ditemukan: " + saveDirectory);
 
+        string? target = null;
         try
         {
             Directory.CreateDirectory(backupsDirectory);
             var name = now.ToString(NameFormat, CultureInfo.InvariantCulture);
-            var target = Path.Combine(backupsDirectory, name);
+            target = Path.Combine(backupsDirectory, name);
             for (var n = 2; Directory.Exists(target); n++) target = Path.Combine(backupsDirectory, $"{name}-{n}");
             Directory.CreateDirectory(target);
 
@@ -51,6 +52,9 @@ public static class SaveBackup
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
+            // A half-made backup must not count as one, nor push a complete older one out later.
+            try { if (target is not null && Directory.Exists(target)) Directory.Delete(target, recursive: true); }
+            catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException) { }
             throw new ModOperationException("Cadangan save tidak bisa dibuat: " + e.Message);
         }
     }

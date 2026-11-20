@@ -81,7 +81,7 @@ public sealed class Bridge
 
             case "reincarnate":
                 return SendReincarnation(args["slot"]!.GetValue<int>(), args["fingerprint"]!.GetValue<string>(),
-                    args["level"]!.GetValue<int>());
+                    args["level"]!.GetValue<int>(), args["simulate"]?.GetValue<bool>() ?? false);
 
             case "getReincarnationResult":
                 return ReadReincarnationResult(args["commandId"]!.GetValue<string>());
@@ -182,16 +182,17 @@ public sealed class Bridge
     }
 
     /// <summary>Backs the save files up, then leaves a command for the mod to pick up.</summary>
-    private object SendReincarnation(int slot, string fingerprint, int level)
+    /// <param name="simulate">What the player was shown: true when the dialog promised that nothing would change.</param>
+    private object SendReincarnation(int slot, string fingerprint, int level, bool simulate)
     {
         if (!IsGameRunning()) throw new ModOperationException("Game tidak sedang berjalan.");
-        if (File.Exists(_paths.CommandFile))
+        if (File.Exists(_paths.CommandFile) || File.Exists(_paths.CommandFile + ".taken"))
             throw new ModOperationException("Masih ada perintah yang menunggu game. Tunggu sampai selesai atau batalkan dulu.");
 
         var backup = SaveBackup.Create(SaveBackup.DefaultSaveDirectory, _paths.SaveBackupsDirectory, DateTime.Now);
 
         var command = new ReincarnationCommand(Guid.NewGuid().ToString("D"), ReincarnationCommand.Reincarnate, slot,
-            fingerprint, level, CommandProcessor.Stamp(DateTimeOffset.UtcNow));
+            fingerprint, level, CommandProcessor.Stamp(DateTimeOffset.UtcNow), simulate);
         try
         {
             Directory.CreateDirectory(_paths.BridgeDirectory);

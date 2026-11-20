@@ -50,7 +50,8 @@ public sealed record ReincarnationCommand(
     int Slot,
     string? ExpectedFingerprint = null,
     int? ExpectedLevel = null,
-    string? CreatedAt = null)
+    string? CreatedAt = null,
+    bool Simulate = false)
 {
     public const string Reincarnate = "reincarnate";
 }

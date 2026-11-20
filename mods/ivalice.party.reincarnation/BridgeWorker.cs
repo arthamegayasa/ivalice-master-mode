@@ -21,7 +21,9 @@ internal sealed class BridgeWorker(BridgePaths paths, string modVersion, int pro
     private long _lastExportAt = long.MinValue / 2;
     private string? _lastContent;
     private DateTimeOffset _lastWriteAt;
-    private string? _lastHandledFile;
+    /// <summary>Commands already answered in this game session; the same id is never carried out twice.</summary>
+    private readonly HashSet<Guid> _answered = [];
+    private string TakenFile => paths.CommandFile + ".taken";
     private bool _reportedExportFailure;
 
     /// <summary>
@@ -32,6 +34,7 @@ internal sealed class BridgeWorker(BridgePaths paths, string modVersion, int pro
     {
         Directory.CreateDirectory(paths.BridgeDirectory);
         File.Delete(paths.CommandFile);
+        File.Delete(paths.CommandFile + ".taken");
         foreach (var old in Directory.EnumerateFiles(paths.BridgeDirectory, "result-*.json"))
             if (File.GetLastWriteTimeUtc(old) < utcNow.AddDays(-1)) File.Delete(old);
     }
@@ -53,34 +56,34 @@ internal sealed class BridgeWorker(BridgePaths paths, string modVersion, int pro
     {
         if (!File.Exists(paths.CommandFile)) return false;
 
+        // Take the file before reading it. From here on the Control Center can no longer withdraw the
+        // command: its cancel only removes command.json, and reports honestly when that is gone.
         string text;
         DateTimeOffset fileTime;
         try
         {
-            text = File.ReadAllText(paths.CommandFile);
-            fileTime = new DateTimeOffset(File.GetLastWriteTimeUtc(paths.CommandFile), TimeSpan.Zero);
+            // A file written by hand may be caught half-written and read as garbage; give its writer a moment.
+            var age = now - new DateTimeOffset(File.GetLastWriteTimeUtc(paths.CommandFile), TimeSpan.Zero);
+            if (age.TotalSeconds < 2 && CommandProcessor.Parse(File.ReadAllText(paths.CommandFile)) is { Id: null, Refusal: Refusal.Malformed })
+                return false;
+
+            File.Move(paths.CommandFile, TakenFile, overwrite: true);
+            text = File.ReadAllText(TakenFile);
+            fileTime = new DateTimeOffset(File.GetLastWriteTimeUtc(TakenFile), TimeSpan.Zero);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            return false; // Still being written; look again on the next tick.
+            return false; // Withdrawn or still being written; look again on the next tick.
         }
 
         var parsed = CommandProcessor.Parse(text);
-        // A file caught half-written reads as garbage; give its writer a moment before answering.
-        if (parsed is { Id: null, Refusal: Refusal.Malformed } && (now - fileTime).TotalSeconds < 2) return false;
-
-        // The same file seen twice was already answered; only removing it failed last time.
-        var fileKey = $"{parsed.Id}@{fileTime.UtcTicks}";
-        if (fileKey == _lastHandledFile)
-        {
-            TryDelete(paths.CommandFile);
-            return false;
-        }
-        _lastHandledFile = fileKey;
 
         CommandResult result;
         if (parsed.Command is not { } command)
             result = CommandProcessor.Refuse(parsed.Id, parsed.Refusal, settings.SafeMode, now);
+        else if (parsed.Id is { } seen && !_answered.Add(seen))
+            // The same command arriving again (for example re-sent after loading an older save) is not repeated.
+            result = CommandProcessor.Refuse(parsed.Id, Refusal.Expired, settings.SafeMode, now);
         else
         {
             if (settings.DebugLog)
@@ -103,7 +106,7 @@ internal sealed class BridgeWorker(BridgePaths paths, string modVersion, int pro
         {
             log($"Could not write the answer to command {result.Id ?? "without id"} ({e.Message}). Outcome: {result.Reason}, applied: {result.Applied}.");
         }
-        TryDelete(paths.CommandFile);
+        TryDelete(TakenFile);
         return true;
     }
 
