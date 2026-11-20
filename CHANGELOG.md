@@ -2,6 +2,24 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-11-20
+
+### Added
+
+- **Turbo follow** in Smart Auto Battle: with Improved Fast Forward on, a party member on auto-battle is now fast-forwarded like an enemy. Before, the game paused for about three seconds before each of their actions even at 6x.
+  - Cause: the turbo mod holds certain battle states at normal speed whenever the acting unit belongs to the player, so the player can read and choose. It judges that from the unit's permanent ownership flag, so a unit on auto-battle was held back too. The longest of those states is a 180-tick preview of the chosen action.
+  - Fix: Smart Auto Battle hooks the point where the game asks how many logic ticks to run this frame and, for a player-owned unit that the AI is driving, restores the tick count the turbo mod last used.
+  - Setting "Keep turbo speed on auto-battle" (on by default) in Ivalice Control Center.
+
+### Verified
+
+- Measured in one battle with turbo at 6x: the pre-action hold lasted 3037 ms without the setting and 400 to 501 ms with it, switched live in the same battle. With turbo off it stayed at 3037 ms.
+- 50 tests cover the battle logic, including the turbo-follow rules.
+
+### Not verified
+
+- Other turbo speeds than 6x, and units driven by the AI because of a status such as Berserk.
+
 ## [0.2.1] - 2026-11-20
 
 ### Changed
@@ -92,6 +110,7 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
+[0.3.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.3.0
 [0.2.1]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.1
 [0.2.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.0
 [0.1.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.1.0

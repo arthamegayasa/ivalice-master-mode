@@ -35,6 +35,11 @@ public class Config : Configurable<Config>
     [DefaultValue(true)]
     public bool ReviveFallenAllies { get; set; } = true;
 
+    [DisplayName("Keep turbo speed on auto-battle")]
+    [Description("With Improved Fast Forward on, units on auto-battle are fast-forwarded like enemies instead of pausing before each action.")]
+    [DefaultValue(true)]
+    public bool FollowTurbo { get; set; } = true;
+
     [DisplayName("Toggle with F8")]
     [Description("Press F8 while the game window is focused to switch Smart Auto Battle on or off. F8 always works when the stick toggle is off.")]
     [DefaultValue(true)]

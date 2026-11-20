@@ -28,6 +28,8 @@ This project's own mod. When a fight starts, your units act on their own using t
 
 Press **F8** or click both sticks (**L3 + R3**) to switch it off and on during play; a high beep means on, a low beep means off. That is the way to take control back: while the mod is on, choosing Manual in the game's Auto-battle menu does not stick. Protect Allies and Run Like a Rabbit picked in that menu are left alone, and guests and enemies are never touched. The heal threshold and which skillsets count as healers are set in the Control Center.
 
+With Improved Fast Forward on, units on auto-battle keep the turbo speed. Without this, the game pauses about three seconds before each of their actions, because the turbo mod holds those moments at normal speed for any unit the player owns.
+
 **Status: tested in random battles on one save.** Units acted on their own from the first turn, a healer switched to saving a wounded ally, and F8 handed control back. Story battles with guests and special win conditions have not been tried, so save before using it there. The game still stops for its own pop-ups (for example when a unit finds an item) until you confirm them. [How it works](docs/smart-auto-battle.md) lists the evidence, the known limits and what is still unconfirmed.
 
 ## Mods in the catalog

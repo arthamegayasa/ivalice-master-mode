@@ -23,6 +23,20 @@ The hooked function is small and only writes `rax`, `rcx` and `rdx`. The game's 
 
 The hook is therefore an assembly stub that pushes `rax`, `rcx`, `rdx` and `r8` to `r11`, saves `xmm0` to `xmm5`, calls into the mod, and restores everything before the game's own instructions run. On load the mod tests this inside the game: it calls the hooked function with marker values in `r8` to `r11` and a throwaway object, and removes the hook if any marker is lost.
 
+## Turbo follow
+
+Improved Fast Forward speeds the game up by making it run several logic ticks per rendered frame. It deliberately returns to one tick per frame in a list of battle states when the acting unit belongs to the player, so the player can read and choose. It decides ownership from the unit's permanent control flag (`+0x1EE` bit `0x08`), which auto-battle does not clear, so a unit on auto-battle is held at normal speed in those states too. The longest is state 25, where the game previews an AI unit's chosen action for 180 ticks (`20c4d1 mov edi,0xb4`): three seconds.
+
+The mod hooks the game's per-frame task runner right after it asks how many ticks to run (RVA `0x257507`, after `call 0x1e8ac4`) and may replace the answer. `TurboFollower` in `src/Ivalice.Battle` holds the rule:
+
+- In a moment the turbo mod does not hold back, remember the tick count it asked for. That is the current turbo speed; 1 means turbo is off.
+- In a held moment, if the acting unit is player-owned and currently driven by the AI (the game's effective control flag at scene object `+0x154` is clear) and the turbo mod asked for 1 tick, run the remembered count instead.
+- Outside battles and menus (event scenes, world map) do nothing and forget the remembered count.
+
+Measured in play at 6x: the state-25 hold took 3037 ms without turbo follow and about 500 ms with it.
+
+The signatures used (each matches once): the task runner call site `4C 8B 05 ?? ?? ?? ?? 49 8B C8 E8 ?? ?? ?? ?? 45 33 FF 44 8B F0`, the function returning the acting unit's scene object, and a read of the battle state variable.
+
 ## Limits to know about
 
 - While the mod is on, choosing Manual in the in-game Auto-battle menu does not stick: the game stores Manual as "no mode", and the mod fills that in again. Use the toggle to take control back.

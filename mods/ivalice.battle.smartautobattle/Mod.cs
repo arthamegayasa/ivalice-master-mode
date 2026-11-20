@@ -33,6 +33,22 @@ public unsafe class Mod : ModBase // <= Do not Remove.
 
     /// <summary>Offset, in the object passed to the hooked function, of the pointer to its battle unit.</summary>
     private const int SceneUnitPointer = 0x148;
+    /// <summary>Offset, in the same object, of the control flags the game acts on this turn.</summary>
+    private const int SceneControlFlags = 0x154;
+
+    // In the game's per-frame task runner: loads the speed manager, calls the function that says how many
+    // logic ticks to run this frame, then keeps the answer. The hook sits right after that call.
+    private const string TickCountPattern = "4C 8B 05 ?? ?? ?? ?? 49 8B C8 E8 ?? ?? ?? ?? 45 33 FF 44 8B F0";
+    private const int TickCountHookOffset = 0x0F;
+    private const int SpeedContextOffset = 0x60;
+
+    // The function that returns the scene object of the unit whose turn it is (or null).
+    private const string ActiveActorPattern =
+        "48 8B 0D ?? ?? ?? ?? EB 0F 0F B6 41 08 3B 05 ?? ?? ?? ?? 74 0B 48 8B 09 48 85 C9 75 EC 33 C0 C3 48 8B C1 C3 4C 8B 0D";
+
+    // A read of the battle state machine's current state: "mov eax, [rip+disp]".
+    private const string BattleStatePattern =
+        "8B 05 ?? ?? ?? ?? 83 F8 34 0F 84 ?? ?? ?? ?? 83 F8 3A 0F 84 ?? ?? ?? ?? 48 63 05 ?? ?? ?? ?? 48 8D 3D";
 
     private const int VkF8 = 0x77;
     private const ushort BothSticks = 0x0040 | 0x0080;
@@ -40,12 +56,27 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     [Function(CallingConventions.Microsoft)]
     private delegate void BeforeRefreshControl(nint sceneUnit);
 
+    [Function(CallingConventions.Microsoft)]
+    private delegate int AdjustTickCount(int iterations);
+
     private readonly IReloadedHooks? _hooks;
     private readonly ILogger _logger;
     private volatile Config _configuration;
 
     private IAsmHook? _refreshControlHook;
     private IReverseWrapper<BeforeRefreshControl>? _beforeRefreshControl;
+
+    private IAsmHook? _tickCountHook;
+    private IReverseWrapper<AdjustTickCount>? _adjustTickCount;
+    private readonly TurboFollower _turboFollower = new();
+    private byte** _speedManagerGlobal;
+    private int* _battleStateGlobal;
+    private delegate* unmanaged<byte*> _getActiveActor;
+
+    /// <summary>The battle state in which the game shows an AI unit's chosen action before running it.</summary>
+    private const int ConfirmActionState = 25;
+    /// <summary>Diagnostics: when the current pre-action hold of a unit on auto began, or 0.</summary>
+    private long _holdStartedAt;
     private byte* _unitTable;
     private volatile PlannerSettings _settings;
     private volatile bool _active;
@@ -109,6 +140,98 @@ public unsafe class Mod : ModBase // <= Do not Remove.
 
             new Thread(WatchToggle) { IsBackground = true, Name = "SmartAutoBattle toggle" }.Start();
         });
+
+        scanner.AddMainModuleScan(ActiveActorPattern, result =>
+        {
+            if (result.Found) _getActiveActor = (delegate* unmanaged<byte*>)(gameBase + result.Offset);
+        });
+
+        scanner.AddMainModuleScan(BattleStatePattern, result =>
+        {
+            if (!result.Found) return;
+            var read = (byte*)(gameBase + result.Offset);
+            _battleStateGlobal = (int*)(read + 6 + *(int*)(read + 2));
+        });
+
+        // Registered last, so the scans it depends on have already reported.
+        scanner.AddMainModuleScan(TickCountPattern, result =>
+        {
+            if (!result.Found || _unitTable == null || _getActiveActor == null || _battleStateGlobal == null)
+            {
+                _logger.WriteLine($"{Tag} Turbo follow is unavailable on this game version; auto-battle itself is not affected.");
+                return;
+            }
+
+            var load = (byte*)(gameBase + result.Offset);
+            _speedManagerGlobal = (byte**)(load + 7 + *(int*)(load + 3));
+            try
+            {
+                _tickCountHook = _hooks.CreateAsmHook(BuildTickCountAssembly(), gameBase + result.Offset + TickCountHookOffset,
+                    new AsmHookOptions { Behaviour = AsmHookBehaviour.ExecuteFirst, PreferRelativeJump = true, MaxOpcodeSize = 5 });
+                _tickCountHook.Activate();
+                _logger.WriteLine($"{Tag} Turbo follow ready: units on auto-battle keep the turbo speed.");
+            }
+            catch (Exception e)
+            {
+                _logger.WriteLine($"{Tag} Turbo follow could not be installed ({e.Message}); auto-battle itself is not affected.");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Runs right after the game asked how many logic ticks to run this frame (the answer is in eax),
+    /// and replaces the answer with <see cref="OnTickCount"/>'s. Every other register is preserved.
+    /// The stack is 16-byte aligned at this point in the game's function, and stays so after six pushes.
+    /// </summary>
+    private string[] BuildTickCountAssembly() =>
+    [
+        "use64",
+        "push rcx", "push rdx", "push r8", "push r9", "push r10", "push r11",
+        "sub rsp, 0x80",
+        "movdqu [rsp+0x20], xmm0", "movdqu [rsp+0x30], xmm1", "movdqu [rsp+0x40], xmm2",
+        "movdqu [rsp+0x50], xmm3", "movdqu [rsp+0x60], xmm4", "movdqu [rsp+0x70], xmm5",
+        "mov ecx, eax",
+        _hooks!.Utilities.GetAbsoluteCallMnemonics<AdjustTickCount>(OnTickCount, out _adjustTickCount),
+        "movdqu xmm0, [rsp+0x20]", "movdqu xmm1, [rsp+0x30]", "movdqu xmm2, [rsp+0x40]",
+        "movdqu xmm3, [rsp+0x50]", "movdqu xmm4, [rsp+0x60]", "movdqu xmm5, [rsp+0x70]",
+        "add rsp, 0x80",
+        "pop r11", "pop r10", "pop r9", "pop r8", "pop rdx", "pop rcx",
+    ];
+
+    private int OnTickCount(int iterations)
+    {
+        // Runs once per frame on the game's main thread. Nothing here may throw.
+        try
+        {
+            var follow = _configuration.FollowTurbo;
+
+            var speedManager = *_speedManagerGlobal;
+            if (speedManager == null) return iterations;
+
+            ActingUnit? acting = null;
+            var actor = _getActiveActor();
+            if (actor != null)
+            {
+                var unit = *(byte**)(actor + SceneUnitPointer);
+                var offset = unit - _unitTable;
+                if (unit != null && offset >= 0 && offset < BattleLayout.TableSize && offset % BattleLayout.Stride == 0)
+                    acting = new ActingUnit(
+                        PlayerOwned: (unit[BattleLayout.PermanentFlags] & BattleLayout.ControlBit) != 0,
+                        AiDriven: (actor[SceneControlFlags] & BattleLayout.ControlBit) == 0);
+            }
+
+            var adjusted = follow
+                ? _turboFollower.Adjust(iterations, *(int*)(speedManager + SpeedContextOffset), *_battleStateGlobal, acting)
+                : iterations;
+            if (_configuration.DebugLog) LogHoldDuration(acting, *_battleStateGlobal, iterations, adjusted);
+            return adjusted;
+        }
+        catch (Exception e)
+        {
+            if (!_reportedFailure) _logger.WriteLine($"{Tag} Unexpected error in turbo follow, speed left alone: {e.Message}");
+            _reportedFailure = true;
+            return iterations;
+        }
     }
 
     /// <summary>
@@ -174,6 +297,22 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         unit[BattleLayout.AutoTarget] = o.Target;
         unit[BattleLayout.AutoMode] = o.Mode;
         _ordered[slot] = true;
+    }
+
+    /// <summary>Diagnostics: how long the game showed an auto unit's chosen action before running it.</summary>
+    private void LogHoldDuration(ActingUnit? acting, int battleState, int iterations, int adjusted)
+    {
+        var holding = battleState == ConfirmActionState && acting is { PlayerOwned: true, AiDriven: true };
+        if (holding && _holdStartedAt == 0)
+        {
+            _holdStartedAt = Stopwatch.GetTimestamp();
+            _logger.WriteLine($"{Tag} Pre-action hold begins: turbo mod asked for {iterations} tick(s) per frame, running {adjusted}.");
+        }
+        else if (!holding && _holdStartedAt != 0)
+        {
+            _logger.WriteLine($"{Tag} Pre-action hold lasted {Stopwatch.GetElapsedTime(_holdStartedAt).TotalMilliseconds:F0} ms.");
+            _holdStartedAt = 0;
+        }
     }
 
     /// <summary>Diagnostics: writes a line whenever a unit's HP differs from the last time it was looked at.</summary>
