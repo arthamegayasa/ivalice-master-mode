@@ -2,6 +2,27 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-11-20
+
+Pre-release: Smart Auto Battle is still not confirmed in a full battle.
+
+### Fixed
+
+- **Crash when a battle started with Smart Auto Battle enabled** (access violation in `FFT_enhanced.exe` at RVA `0x2026F6`). The game's code keeps a pointer in register `r8` across its call to the function the mod hooks, because the original function never writes that register. The mod's hook ran managed code there and overwrote it. The hook is now an assembly hook that saves and restores every volatile register around the call into the mod.
+
+### Added
+
+- A self-test that runs inside the game when the mod loads: it calls the hooked function with marker values in `r8` to `r11` and checks they survive. If they do not, the mod removes its hook and stays inactive instead of risking a crash. The Reloaded-II log shows `Self-test passed` or `Self-test FAILED`.
+
+### Verified
+
+- The self-test reported `CLOBBERED` with the 0.2.0 hook and passes with the new one, on the same game build.
+- The crash dump showed `r8 = rcx = 0x200` at the faulting instruction, with the return address inside the caller that reloads `rcx` from `r8`.
+
+### Not verified
+
+- A full battle with the mod on has still not been played through.
+
 ## [0.2.0] - 2026-11-20
 
 Pre-release: Smart Auto Battle has not been tested inside a battle yet.
@@ -61,5 +82,6 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
+[0.2.1]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.1
 [0.2.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.0
 [0.1.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.1.0

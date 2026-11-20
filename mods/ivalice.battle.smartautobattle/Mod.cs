@@ -4,6 +4,7 @@ using Ivalice.Battle;
 using ivalice.battle.smartautobattle.Configuration;
 using ivalice.battle.smartautobattle.Template;
 using Reloaded.Hooks.Definitions;
+using Reloaded.Hooks.Definitions.Enums;
 using Reloaded.Hooks.Definitions.X64;
 using Reloaded.Memory.SigScan.ReloadedII.Interfaces;
 using Reloaded.Mod.Interfaces;
@@ -37,13 +38,14 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private const ushort BothSticks = 0x0040 | 0x0080;
 
     [Function(CallingConventions.Microsoft)]
-    private delegate void RefreshControl(nint sceneUnit);
+    private delegate void BeforeRefreshControl(nint sceneUnit);
 
     private readonly IReloadedHooks? _hooks;
     private readonly ILogger _logger;
     private volatile Config _configuration;
 
-    private IHook<RefreshControl>? _refreshControlHook;
+    private IAsmHook? _refreshControlHook;
+    private IReverseWrapper<BeforeRefreshControl>? _beforeRefreshControl;
     private byte* _unitTable;
     private volatile PlannerSettings _settings;
     private volatile bool _active;
@@ -88,15 +90,45 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             }
 
             var address = gameBase + result.Offset;
-            _refreshControlHook = _hooks.CreateHook<RefreshControl>(RefreshControlImpl, address);
+            _refreshControlHook = _hooks.CreateAsmHook(BuildHookAssembly(), address, AsmHookBehaviour.ExecuteFirst);
             _refreshControlHook.Activate();
+
+            if (!RegisterSelfTest.RegistersSurvive(address))
+            {
+                _refreshControlHook.Disable();
+                _logger.WriteLine($"{Tag} Self-test FAILED: the hook does not preserve the registers the game relies on. The hook was removed and the mod is inactive.");
+                return;
+            }
+
+            _logger.WriteLine($"{Tag} Self-test passed: registers are preserved across the hooked call.");
             _logger.WriteLine($"{Tag} Ready: unit table at 0x{(nint)_unitTable:X}, control refresh hooked at 0x{address:X}. Auto battle is {(_active ? "ON" : "OFF")}; toggle with F8 or L3+R3.");
 
             new Thread(WatchToggle) { IsBackground = true, Name = "SmartAutoBattle toggle" }.Start();
         });
     }
 
-    private void RefreshControlImpl(nint sceneUnit)
+    /// <summary>
+    /// Code that runs at the top of the game's function, before its own instructions.
+    /// The game's callers keep live values in volatile registers across this call (its compiler knew the
+    /// function never writes them; r8 is used right after the call at RVA 0x20289C), so every register
+    /// that managed code may overwrite is saved and restored around the call into this mod.
+    /// </summary>
+    private string[] BuildHookAssembly() =>
+    [
+        "use64",
+        // Seven pushes leave the stack 16-byte aligned for the call below.
+        "push rax", "push rcx", "push rdx", "push r8", "push r9", "push r10", "push r11",
+        "sub rsp, 0x80", // 0x20 shadow space + six 16-byte slots
+        "movdqu [rsp+0x20], xmm0", "movdqu [rsp+0x30], xmm1", "movdqu [rsp+0x40], xmm2",
+        "movdqu [rsp+0x50], xmm3", "movdqu [rsp+0x60], xmm4", "movdqu [rsp+0x70], xmm5",
+        _hooks!.Utilities.GetAbsoluteCallMnemonics<BeforeRefreshControl>(OnBeforeRefreshControl, out _beforeRefreshControl),
+        "movdqu xmm0, [rsp+0x20]", "movdqu xmm1, [rsp+0x30]", "movdqu xmm2, [rsp+0x40]",
+        "movdqu xmm3, [rsp+0x50]", "movdqu xmm4, [rsp+0x60]", "movdqu xmm5, [rsp+0x70]",
+        "add rsp, 0x80",
+        "pop r11", "pop r10", "pop r9", "pop r8", "pop rdx", "pop rcx", "pop rax",
+    ];
+
+    private void OnBeforeRefreshControl(nint sceneUnit)
     {
         // Runs on the game's own thread, once per step of the acting unit's turn.
         // Nothing here may throw: an exception would unwind into the game's native code.
@@ -109,8 +141,6 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             if (!_reportedFailure) _logger.WriteLine($"{Tag} Unexpected error, the unit was left alone: {e.Message}");
             _reportedFailure = true;
         }
-
-        _refreshControlHook!.OriginalFunction(sceneUnit);
     }
 
     private void Apply(byte* unit)

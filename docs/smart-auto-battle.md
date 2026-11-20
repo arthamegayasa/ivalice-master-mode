@@ -17,6 +17,12 @@ On every step of a unit's turn the game calls a small function that decides whet
 
 Switching the mod off (F8 or L3 + R3) clears every mode it wrote, on the next turn step. The on/off state lasts until it is toggled again or the game is closed; it is not reset for each battle.
 
+## Why the hook saves every register
+
+The hooked function is small and only writes `rax`, `rcx` and `rdx`. The game's compiler knew that, so callers keep live values in other volatile registers across the call. At RVA `0x20288C` to `0x20289F` the game does `mov r8, rax`, calls the hooked function, then `mov rcx, r8` and calls the next function with it. A normal function hook runs managed code, which is free to overwrite `r8` to `r11` and `xmm0` to `xmm5`; version 0.2.0 did exactly that and the game crashed at RVA `0x2026F6` on the first battle.
+
+The hook is therefore an assembly stub that pushes `rax`, `rcx`, `rdx` and `r8` to `r11`, saves `xmm0` to `xmm5`, calls into the mod, and restores everything before the game's own instructions run. On load the mod tests this inside the game: it calls the hooked function with marker values in `r8` to `r11` and a throwaway object, and removes the hook if any marker is lost.
+
 ## Limits to know about
 
 - While the mod is on, choosing Manual in the in-game Auto-battle menu does not stick: the game stores Manual as "no mode", and the mod fills that in again. Use the toggle to take control back.
