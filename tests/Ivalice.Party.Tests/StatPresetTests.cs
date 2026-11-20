@@ -35,11 +35,33 @@ public class StatPresetTests
     }
 
     [Fact]
-    public void A_neutral_percentage_preserves_edits_in_that_column()
+    public void Reapplying_a_custom_preset_to_Chemist_recomputes_the_selected_stats_from_defaults()
     {
-        var result = new StatPreset(PresetScope.Generic, [0], 100, 25).Apply(Draft, Jobs);
-        Assert.Equal(99, result.Jobs[74].Growth[0]);
-        Assert.Equal(19, result.Jobs[74].Multiplier[0]);
+        JobDefaults chemist = new(75, [12, 16, 100, 75, 50], [80, 75, 100, 75, 80]);
+        var draft = StatTuningRules.Empty;
+        foreach (var (percent, growth, multiplier) in new[] { (200, 6, 160), (100, 12, 80), (150, 8, 120) })
+        {
+            draft = new StatPreset(PresetScope.Both, [0], percent, percent).Apply(draft, [chemist]);
+            draft.Jobs.TryGetValue(75, out var rule);
+            Assert.Equal(growth, rule?.Growth[0] ?? chemist.Growth[0]);
+            Assert.Equal(multiplier, rule?.Multiplier[0] ?? chemist.Multiplier[0]);
+            if (percent == 100) Assert.Empty(draft.Jobs);
+        }
+    }
+
+    [Fact]
+    public void Quick_presets_leave_unspecified_columns_and_unselected_stats_alone()
+    {
+        var growthOnly = new StatPreset(PresetScope.Generic, [0], 150, null).Apply(Draft, Jobs);
+        Assert.Equal(7, growthOnly.Jobs[74].Growth[0]);
+        Assert.Equal(Draft.Jobs[74].Multiplier, growthOnly.Jobs[74].Multiplier);
+        var multiplierOnly = new StatPreset(PresetScope.Generic, [0], null, 120).Apply(growthOnly, Jobs);
+        Assert.Equal(growthOnly.Jobs[74].Growth, multiplierOnly.Jobs[74].Growth);
+        Assert.Equal(90, multiplierOnly.Jobs[74].Multiplier[0]);
+        var resetGrowth = new StatPreset(PresetScope.Generic, [0], 100, 120).Apply(multiplierOnly, Jobs);
+        Assert.Null(resetGrowth.Jobs[74].Growth[0]);
+        Assert.Equal(14, resetGrowth.Jobs[74].Growth[1]);
+        Assert.Equal(90, resetGrowth.Jobs[74].Multiplier[0]);
     }
 
     [Fact]

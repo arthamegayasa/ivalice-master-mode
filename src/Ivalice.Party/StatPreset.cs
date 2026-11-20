@@ -13,7 +13,8 @@ public sealed record JobDefaults(int Job, int[] Growth, int[] Multiplier)
 
 public enum PresetScope { Generic, Special, Both }
 
-public sealed record StatPreset(PresetScope Scope, int[] Stats, int GrowthPercent, int MultiplierPercent)
+/// <summary>A missing percentage leaves that column alone. An explicit percentage scales the job default.</summary>
+public sealed record StatPreset(PresetScope Scope, int[] Stats, int? GrowthPercent, int? MultiplierPercent)
 {
     /// <summary>Added to each job's own base Move and Jump; 0 leaves the draft's value alone.</summary>
     public int MoveBonus { get; init; }
@@ -42,10 +43,10 @@ public sealed record StatPreset(PresetScope Scope, int[] Stats, int GrowthPercen
             var multiplier = previous?.Multiplier.ToArray() ?? new int?[StatBlock.Count];
             foreach (var i in Stats)
             {
-                if (GrowthPercent != 100)
-                    growth[i] = Override(job.Growth[i], StatTuningRules.ScaleGrowth(job.Growth[i], GrowthPercent));
-                if (MultiplierPercent != 100)
-                    multiplier[i] = Override(job.Multiplier[i], StatTuningRules.ScaleMultiplier(job.Multiplier[i], MultiplierPercent));
+                if (GrowthPercent is int growthPercent)
+                    growth[i] = Override(job.Growth[i], StatTuningRules.ScaleGrowth(job.Growth[i], growthPercent));
+                if (MultiplierPercent is int multiplierPercent)
+                    multiplier[i] = Override(job.Multiplier[i], StatTuningRules.ScaleMultiplier(job.Multiplier[i], multiplierPercent));
             }
             // A job whose own Move or Jump is 0 (or unknown) is left alone, like a growth or multiplier of 0.
             var move = MoveBonus != 0 && job.Move > 0

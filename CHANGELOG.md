@@ -2,6 +2,10 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.6.1] - 2026-11-21
+
+- The custom Stat preset now restores selected growth or multiplier values to the job defaults at 100%. Quick presets preserve unrelated draft values. The job table labels distinguish the game's original values from the editable draft.
+
 ## [0.6.0] - 2026-11-21
 
 ### Added
@@ -226,6 +230,7 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
+[0.6.1]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.6.1
 [0.6.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.6.0
 [0.5.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.5.0
 [0.4.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.4.0
