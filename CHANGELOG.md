@@ -39,11 +39,12 @@ All notable changes to this project are recorded here. Versions follow [Semantic
 - The game's next autosave, decoded from a copy, held her record at level 1 with the stamp in the spare bytes.
 - From the Control Center: the tab listed the party from the running game, showed the in-battle refusal during deployment, and on the world map the Reinkarnasi button backed up the saves, sent the command and showed the result (Ealdwine, Power +1.5%) while the game window was not focused.
 
+- After a battle, with the game still holding battle copies of the units that fought, one of them was reincarnated. Starting the next battle did not bring the old level back; the deployment panel showed her at level 1, she fought that battle on auto, and after it her record was still level 1 with the stamp. Sending the same command again was refused.
+
 ### Not verified
 
-- A battle fought by a reincarnated unit, and loading a save that holds one, were not played through; the save file itself was decoded and holds the change.
+- Loading a save that holds a reincarnated unit was not played through; the save file itself was decoded and holds the change.
 - A second reincarnation of the same unit in the game (stacking is covered by tests only).
-- Units returning from a battle with a leftover battle copy were not reincarnated in the game; mirroring the change into that copy is covered by tests only.
 - Story characters other than Ramza.
 
 ## [0.3.0] - 2026-11-20
