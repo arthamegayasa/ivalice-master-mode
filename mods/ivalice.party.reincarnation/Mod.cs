@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using Ivalice.Party;
 using ivalice.party.reincarnation.Configuration;
 using ivalice.party.reincarnation.Template;
@@ -15,9 +14,9 @@ namespace ivalice.party.reincarnation;
 
 /// <summary>
 /// Reincarnation: a party member gives up its levels for better starting stats. The rules live in
-/// <see cref="Reincarnation"/>; this class finds the game's data, gets a safe moment on the game's main
-/// thread once per frame, and there exchanges files with Ivalice Control Center: it writes the roster
-/// out, and reads, checks and carries out commands. See docs/reincarnation.md for the evidence.
+/// <see cref="Reincarnation"/> and the file exchange with Ivalice Control Center in
+/// <see cref="BridgeWorker"/>; this class finds the game's data and gets a safe moment on the game's
+/// main thread once per frame. See docs/reincarnation.md for the evidence behind every address.
 /// </summary>
 public unsafe class Mod : ModBase // <= Do not Remove.
 {
@@ -63,10 +62,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         "8B 05 ?? ?? ?? ?? 83 F8 34 0F 84 ?? ?? ?? ?? 83 F8 3A 0F 84 ?? ?? ?? ?? 48 63 05 ?? ?? ?? ?? 48 8D 3D";
     private const string BattleModePattern = "83 3D ?? ?? ?? ?? 04 75 29 48 8B 0D ?? ?? ?? ?? 41 8B D5 48 85 C9 74 1A";
 
-    /// <summary>How often the mod looks for a command.</summary>
+    /// <summary>How often the mod looks at the files.</summary>
     private const int TickMilliseconds = 250;
-    /// <summary>How often the roster is compared with what was last written out.</summary>
-    private const int ExportMilliseconds = 1000;
     private const int MaxNameBytes = 64;
 
     [Function(CallingConventions.Microsoft)]
@@ -75,7 +72,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private readonly IReloadedHooks? _hooks;
     private readonly ILogger _logger;
     private volatile Config _configuration;
-    private readonly BridgePaths _paths = BridgePaths.Default;
+    private readonly BridgeWorker _worker;
 
     private nint _gameBase;
     private int _gameSize;
@@ -100,24 +97,20 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private int _gameThread;
     private bool _inTick;
     private long _lastTickAt;
-    private long _lastExportAt;
-    private string? _lastContent;
-    private DateTimeOffset _lastWriteAt;
-    private string? _lastHandledCommand;
     private string? _lastLoggedStatus;
     private bool _reportedFailure;
     private bool _reportedWrongThread;
-    private bool _reportedExportFailure;
 
     public Mod(ModContext context)
     {
         _hooks = context.Hooks;
         _logger = context.Logger;
         _configuration = context.Configuration;
+        _worker = new BridgeWorker(BridgePaths.Default, ModVersion, Environment.ProcessId, Log);
 
         if (_hooks is null || !context.ModLoader.GetController<IStartupScanner>().TryGetTarget(out var scanner))
         {
-            _logger.WriteLine($"{Tag} Hooks or signature scanner unavailable. The mod is inactive.");
+            Log("Hooks or signature scanner unavailable. The mod is inactive.");
             return;
         }
 
@@ -149,6 +142,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         scanner.AddMainModuleScan(TaskRunnerPattern, r => Activate(r.Found, r.Offset));
     }
 
+    private void Log(string message) => _logger.WriteLine($"{Tag} {message}");
+
     /// <summary>The address a rip-relative instruction inside a pattern match refers to, or null.</summary>
     private byte* RipTarget(bool found, int matchOffset, int instructionOffset, int displacementOffset, int instructionLength)
     {
@@ -169,21 +164,17 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         if (!taskRunnerFound) missing.Add("frame routine");
         if (missing.Count > 0)
         {
-            _logger.WriteLine($"{Tag} Could not find the game data this mod relies on ({string.Join(", ", missing)}). The game version is probably unsupported; the mod is inactive.");
+            Log($"Could not find the game data this mod relies on ({string.Join(", ", missing)}). The game version is probably unsupported; the mod is inactive.");
             return;
         }
 
         try
         {
-            Directory.CreateDirectory(_paths.BridgeDirectory);
-            // A command never outlives the game session it was meant for.
-            File.Delete(_paths.CommandFile);
-            foreach (var old in Directory.EnumerateFiles(_paths.BridgeDirectory, "result-*.json"))
-                if (File.GetLastWriteTimeUtc(old) < DateTime.UtcNow.AddDays(-1)) File.Delete(old);
+            _worker.Prepare(DateTime.UtcNow);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            _logger.WriteLine($"{Tag} Could not prepare {_paths.BridgeDirectory} ({e.Message}). The mod is inactive.");
+            Log($"Could not prepare {BridgePaths.Default.BridgeDirectory} ({e.Message}). The mod is inactive.");
             return;
         }
 
@@ -192,24 +183,24 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             var lost = TestHookStub();
             if (lost != LostRegisters.None)
             {
-                _logger.WriteLine($"{Tag} Self-test FAILED: the hook stub does not hand back these registers unchanged: {lost}. No hook was installed and the mod is inactive.");
+                Log($"Self-test FAILED: the hook stub does not hand back these registers unchanged: {lost}. No hook was installed and the mod is inactive.");
                 return;
             }
-            _logger.WriteLine($"{Tag} Self-test passed: the hook stub preserves rax, rcx, rdx, r8-r11 and xmm0-xmm5.");
+            Log("Self-test passed: the hook stub preserves rax, rcx, rdx, r8-r11 and xmm0-xmm5.");
 
             var address = _gameBase + taskRunnerOffset;
             _frameHook = _hooks!.CreateAsmHook(BuildHookAssembly(out _frameCallback), address,
                 new AsmHookOptions { Behaviour = AsmHookBehaviour.ExecuteFirst, PreferRelativeJump = true, MaxOpcodeSize = 5 });
             _frameHook.Activate();
 
-            _logger.WriteLine($"{Tag} Ready: roster at 0x{(nint)_roster:X}, battle controller pointer at 0x{(nint)_battleControlPointer:X}, " +
-                              $"battle unit table at 0x{(nint)_battleTable:X}, job table at 0x{(nint)_jobTable:X}, frame routine hooked at 0x{address:X}. " +
-                              $"Names: {(_getDisplayName != null ? "found" : "not found")}. Safe mode is {(_configuration.SafeMode ? "ON" : "OFF")}. " +
-                              $"Files: {_paths.BridgeDirectory}");
+            Log($"Ready: roster at 0x{(nint)_roster:X}, battle controller pointer at 0x{(nint)_battleControlPointer:X}, " +
+                $"battle unit table at 0x{(nint)_battleTable:X}, job table at 0x{(nint)_jobTable:X}, frame routine hooked at 0x{address:X}. " +
+                $"Names: {(_getDisplayName != null ? "found" : "not found")}. Safe mode is {(_configuration.SafeMode ? "ON" : "OFF")}. " +
+                $"Files: {BridgePaths.Default.BridgeDirectory}");
         }
         catch (Exception e)
         {
-            _logger.WriteLine($"{Tag} The frame hook could not be installed ({e.Message}). The mod is inactive.");
+            Log($"The frame hook could not be installed ({e.Message}). The mod is inactive.");
         }
     }
 
@@ -272,7 +263,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             if (_gameThread == 0) _gameThread = thread;
             if (thread != _gameThread)
             {
-                if (!_reportedWrongThread) _logger.WriteLine($"{Tag} The frame routine ran on a second thread; that call was ignored.");
+                if (!_reportedWrongThread) Log("The frame routine ran on a second thread; that call was ignored.");
                 _reportedWrongThread = true;
                 return;
             }
@@ -283,33 +274,30 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         }
         catch (Exception e)
         {
-            if (!_reportedFailure) _logger.WriteLine($"{Tag} Unexpected error, nothing was changed: {e.Message}");
+            if (!_reportedFailure) Log($"Unexpected error, nothing was changed: {e.Message}");
             _reportedFailure = true;
         }
     }
 
-    private void Tick(long now)
+    private void Tick(long tickCount)
     {
         var config = _configuration;
         var roster = new Span<byte>(_roster, RosterLayout.TableSize);
         var battleTable = new ReadOnlySpan<byte>(_battleTable, BattleBinding.TableSize);
         var jobTable = new ReadOnlySpan<byte>(_jobTable, JobTable.TableSize);
-        var game = ReadGameStatus(battleTable);
+
+        var game = GameSafety.Decide(new SafetyInputs(
+            BattleControlPresent: *_battleControlPointer != 0,
+            ActiveActorPresent: _getActiveActor != null ? _getActiveActor() != null : null,
+            BattleUnitsInUse: BattleBinding.CountInUse(battleTable),
+            BattleUnitsBound: BattleBinding.CountBound(battleTable),
+            BattleModeFlag: _battleMode != null ? *_battleMode : null,
+            BattleState: _battleState != null ? *_battleState : null));
         if (config.DebugLog) LogStatusChange(game);
 
-        var handled = HandleCommand(roster, battleTable, jobTable, game, config);
-        if (!handled && now - _lastExportAt < ExportMilliseconds) return;
-        _lastExportAt = now;
-        Export(roster, battleTable, jobTable, game, config);
+        _worker.Tick(tickCount, DateTimeOffset.UtcNow, roster, battleTable, jobTable, game,
+            new WorkerSettings(config.SafeMode, config.DebugLog), config.ResolveNames ? ResolveName : null);
     }
-
-    private GameStatus ReadGameStatus(ReadOnlySpan<byte> battleTable) => GameSafety.Decide(new SafetyInputs(
-        BattleControlPresent: *_battleControlPointer != 0,
-        ActiveActorPresent: _getActiveActor != null ? _getActiveActor() != null : null,
-        BattleUnitsInUse: BattleBinding.CountInUse(battleTable),
-        BattleUnitsBound: BattleBinding.CountBound(battleTable),
-        BattleModeFlag: _battleMode != null ? *_battleMode : null,
-        BattleState: _battleState != null ? *_battleState : null));
 
     private void LogStatusChange(GameStatus game)
     {
@@ -319,102 +307,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
                      $"boundBattleUnits={inputs.BattleUnitsBound}";
         if (status == _lastLoggedStatus) return;
         _lastLoggedStatus = status;
-        _logger.WriteLine($"{Tag} Roster at 0x{(nint)_roster:X}. {status}, battleUnitsInUse={inputs.BattleUnitsInUse}, " +
-                          $"battleState={inputs.BattleState?.ToString() ?? "unknown"}.");
-    }
-
-    /// <returns>True when a command was answered, so the roster file should be refreshed at once.</returns>
-    private bool HandleCommand(Span<byte> roster, ReadOnlySpan<byte> battleTable, ReadOnlySpan<byte> jobTable,
-        GameStatus game, Config config)
-    {
-        if (!File.Exists(_paths.CommandFile)) return false;
-
-        string text;
-        DateTimeOffset fileTime;
-        try
-        {
-            text = File.ReadAllText(_paths.CommandFile);
-            fileTime = new DateTimeOffset(File.GetLastWriteTimeUtc(_paths.CommandFile), TimeSpan.Zero);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return false; // Still being written; look again on the next tick.
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var parsed = CommandProcessor.Parse(text);
-        // A file caught half-written reads as garbage; give its writer a moment before answering.
-        if (parsed is { Id: null, Refusal: Refusal.Malformed } && (now - fileTime).TotalSeconds < 2) return false;
-
-        // The same file seen twice was already answered; only removing it failed last time.
-        var fileKey = $"{parsed.Id}@{fileTime.UtcTicks}";
-        if (fileKey == _lastHandledCommand)
-        {
-            TryDelete(_paths.CommandFile);
-            return false;
-        }
-        _lastHandledCommand = fileKey;
-
-        CommandResult result;
-        if (parsed.Command is not { } command)
-            result = CommandProcessor.Refuse(parsed.Id, parsed.Refusal, config.SafeMode, now);
-        else
-        {
-            if (config.DebugLog)
-                _logger.WriteLine($"{Tag} Command {command.Id}: reincarnate slot {command.Slot}, fingerprint {command.ExpectedFingerprint ?? "none"}, level {command.ExpectedLevel?.ToString() ?? "any"}.");
-            result = CommandProcessor.Execute(command, roster, battleTable, jobTable, game, now, fileTime, config.SafeMode,
-                WriteJournal, ResolveName);
-        }
-
-        if (result.Applied)
-            _logger.WriteLine($"{Tag} Slot {result.Unit?.Slot}: {result.Message} Journal: {_paths.JournalFile}");
-        else if (config.DebugLog)
-            _logger.WriteLine($"{Tag} Command {result.Id ?? "without id"}: {(result.Ok ? "accepted" : "refused")} ({result.Reason}). {result.Message}");
-
-        try
-        {
-            var path = parsed.Id is { } id ? _paths.ResultFile(id) : _paths.InvalidResultFile;
-            WriteAtomically(path, JsonSerializer.Serialize(result, BridgeJson.Default.CommandResult));
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            _logger.WriteLine($"{Tag} Could not write the answer to command {result.Id ?? "without id"} ({e.Message}). Outcome: {result.Reason}, applied: {result.Applied}.");
-        }
-        TryDelete(_paths.CommandFile);
-        return true;
-    }
-
-    private bool WriteJournal(JournalEntry entry)
-    {
-        File.AppendAllText(_paths.JournalFile, JsonSerializer.Serialize(entry, BridgeJson.Default.JournalEntry) + "\n");
-        return true;
-    }
-
-    private void Export(ReadOnlySpan<byte> roster, ReadOnlySpan<byte> battleTable, ReadOnlySpan<byte> jobTable,
-        GameStatus game, Config config)
-    {
-        var units = RosterExport.DescribeAll(roster, battleTable, jobTable, game, ResolveName);
-        var document = new RosterDocument(RosterDocument.CurrentSchema, ModVersion, Environment.ProcessId, WrittenAt: "",
-            config.SafeMode, game, units);
-
-        // Written when something changed, and otherwise often enough to show the game is still alive.
-        var content = RosterFeed.Serialize(document);
-        var now = DateTimeOffset.UtcNow;
-        if (content == _lastContent && (now - _lastWriteAt).TotalSeconds < RosterFeed.HeartbeatSeconds) return;
-
-        try
-        {
-            WriteAtomically(_paths.RosterFile, RosterFeed.Serialize(document with { WrittenAt = CommandProcessor.Stamp(now) }));
-            _lastContent = content;
-            _lastWriteAt = now;
-            _reportedExportFailure = false;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // The Control Center may be reading the file; the next tick tries again.
-            if (!_reportedExportFailure && config.DebugLog) _logger.WriteLine($"{Tag} Could not write the roster file ({e.Message}); will retry.");
-            _reportedExportFailure = true;
-        }
+        Log($"Roster at 0x{(nint)_roster:X}. {status}, battleUnitsInUse={inputs.BattleUnitsInUse}, " +
+            $"battleState={inputs.BattleState?.ToString() ?? "unknown"}.");
     }
 
     /// <summary>
@@ -423,7 +317,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     /// </summary>
     private string? ResolveName(int nameKey)
     {
-        if (_getDisplayName == null || nameKey <= 0 || !_configuration.ResolveNames) return null;
+        if (_getDisplayName == null || nameKey <= 0) return null;
 
         var text = _getDisplayName(nameKey, null);
         var readable = ReadableBytes(text, MaxNameBytes);
@@ -444,24 +338,11 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         return (int)Math.Min(limit, regionEnd - address);
     }
 
-    private static void WriteAtomically(string path, string content)
-    {
-        var temporary = path + ".tmp";
-        File.WriteAllText(temporary, content);
-        File.Move(temporary, path, overwrite: true);
-    }
-
-    private static void TryDelete(string path)
-    {
-        try { File.Delete(path); }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
-    }
-
     #region Standard Overrides
     public override void ConfigurationUpdated(Config configuration)
     {
         _configuration = configuration;
-        _logger.WriteLine($"{Tag} Settings updated: safe mode {(configuration.SafeMode ? "ON" : "OFF")}, names {(configuration.ResolveNames ? "on" : "off")}, diagnostic log {(configuration.DebugLog ? "on" : "off")}.");
+        Log($"Settings updated: safe mode {(configuration.SafeMode ? "ON" : "OFF")}, names {(configuration.ResolveNames ? "on" : "off")}, diagnostic log {(configuration.DebugLog ? "on" : "off")}.");
     }
     #endregion
 

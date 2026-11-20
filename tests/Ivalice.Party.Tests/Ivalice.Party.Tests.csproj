@@ -26,7 +26,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The mod's hook stub and register probe need no running game, so they are tested here. -->
+    <!-- The mod's file handling, hook stub and register probe need no running game, so they are tested here. -->
+    <Compile Include="..\..\mods\ivalice.party.reincarnation\BridgeWorker.cs" Link="Mod\BridgeWorker.cs" />
     <Compile Include="..\..\mods\ivalice.party.reincarnation\HookStub.cs" Link="Mod\HookStub.cs" />
     <Compile Include="..\..\mods\ivalice.party.reincarnation\RegisterSelfTest.cs" Link="Mod\RegisterSelfTest.cs" />
   </ItemGroup>
