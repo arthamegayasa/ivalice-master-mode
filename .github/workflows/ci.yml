@@ -31,3 +31,7 @@ jobs:
         run: dotnet build mods/ivalice.party.reincarnation -c Release --nologo
         env:
           RELOADEDIIMODS: ${{ runner.temp }}\mods
+      - name: Build Stat Tuning
+        run: dotnet build mods/ivalice.party.stattuning -c Release --nologo
+        env:
+          RELOADEDIIMODS: ${{ runner.temp }}\mods

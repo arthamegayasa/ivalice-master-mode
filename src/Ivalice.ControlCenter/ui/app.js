@@ -123,9 +123,12 @@ function renderHeader() {
 
   const footer = document.querySelector("footer");
   const onReincarnation = currentTab === "reinc";
-  footer.classList.toggle("live", snapshot.gameRunning && !onReincarnation);
+  const onStat = currentTab === "stat";
+  footer.classList.toggle("live", snapshot.gameRunning && !onReincarnation && !onStat);
   $("footer-note").textContent = onReincarnation
     ? "Reinkarnasi berlaku langsung di game yang sedang berjalan. Simpan game agar permanen."
+    : onStat
+      ? "Aturan stat yang disimpan dipakai game tanpa perlu ditutup, untuk unit yang dibuat sesudahnya."
     : snapshot.gameRunning
       ? "Game sedang berjalan. Perubahan berlaku setelah game ditutup dan dijalankan lagi."
       : "Perubahan berlaku saat game dijalankan berikutnya.";
@@ -530,7 +533,7 @@ async function cancelReincarnation() {
 let currentTab = "mods";
 function selectTab(name) {
   currentTab = name;
-  for (const tab of ["mods", "reinc", "log"]) {
+  for (const tab of ["mods", "reinc", "stat", "log"]) {
     $("tab-" + tab).setAttribute("aria-selected", String(tab === name));
     $("view-" + tab).hidden = tab !== name;
   }
@@ -538,10 +541,13 @@ function selectTab(name) {
   renderHeader();
   if (name === "log") loadLog();
   if (name === "reinc") loadRoster(true);
+  // Unsaved edits survive a visit to another tab.
+  if (name === "stat") loadStat(statDirty());
 }
 
 $("tab-mods").addEventListener("click", () => selectTab("mods"));
 $("tab-reinc").addEventListener("click", () => selectTab("reinc"));
+$("tab-stat").addEventListener("click", () => selectTab("stat"));
 $("tab-log").addEventListener("click", () => selectTab("log"));
 $("log-refresh").addEventListener("click", loadLog);
 $("reinc-refresh").addEventListener("click", () => loadRoster(true));

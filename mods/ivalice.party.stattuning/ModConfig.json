@@ -1,0 +1,21 @@
+{
+  "ModId": "ivalice.party.stattuning",
+  "ModName": "Stat Tuning",
+  "ModAuthor": "arthamegayasa",
+  "ModVersion": "0.5.0",
+  "ModDescription": "Changes stat growth and stat multipliers per job and per character, for the player's units only unless told otherwise. Set in Ivalice Control Center.",
+  "ModDll": "ivalice.party.stattuning.dll",
+  "ModIcon": "Preview.png",
+  "ModR2RManagedDll32": "",
+  "ModR2RManagedDll64": "",
+  "ModNativeDll32": "",
+  "ModNativeDll64": "",
+  "IsLibrary": false,
+  "ReleaseMetadataFileName": "ivalice.party.stattuning.ReleaseMetadata.json",
+  "PluginData": {},
+  "IsUniversalMod": false,
+  "ModDependencies": [ "Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks" ],
+  "OptionalDependencies": [],
+  "SupportedAppId": [ "fft_enhanced.exe" ],
+  "ProjectUrl": "https://github.com/arthamegayasa/ivalice-master-mode"
+}

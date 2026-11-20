@@ -25,6 +25,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ivalice.Party.Tests", "test
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ivalice.party.reincarnation", "mods\ivalice.party.reincarnation\ivalice.party.reincarnation.csproj", "{2CEEA851-FC88-41C0-B344-33DC2B92B16D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ivalice.party.stattuning", "mods\ivalice.party.stattuning\ivalice.party.stattuning.csproj", "{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -143,6 +145,18 @@ Global
 		{2CEEA851-FC88-41C0-B344-33DC2B92B16D}.Release|x64.Build.0 = Release|Any CPU
 		{2CEEA851-FC88-41C0-B344-33DC2B92B16D}.Release|x86.ActiveCfg = Release|Any CPU
 		{2CEEA851-FC88-41C0-B344-33DC2B92B16D}.Release|x86.Build.0 = Release|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Debug|x64.Build.0 = Debug|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Debug|x86.Build.0 = Debug|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|x64.ActiveCfg = Release|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|x64.Build.0 = Release|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|x86.ActiveCfg = Release|Any CPU
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -157,5 +171,6 @@ Global
 		{615941F9-4D3D-4B0B-BE88-4BDB1E23373F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{FD276535-4F5E-43C1-8BFA-11DDF10576FC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{2CEEA851-FC88-41C0-B344-33DC2B92B16D} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
+		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
 	EndGlobalSection
 EndGlobal

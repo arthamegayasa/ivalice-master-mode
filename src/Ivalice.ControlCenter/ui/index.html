@@ -31,6 +31,7 @@
   <nav class="tabs" role="tablist">
     <button role="tab" id="tab-mods" aria-controls="view-mods" aria-selected="true" type="button">Mod</button>
     <button role="tab" id="tab-reinc" aria-controls="view-reinc" aria-selected="false" type="button">Reinkarnasi</button>
+    <button role="tab" id="tab-stat" aria-controls="view-stat" aria-selected="false" type="button">Stat</button>
     <button role="tab" id="tab-log" aria-controls="view-log" aria-selected="false" type="button">Log</button>
     <span class="tabs-spacer"></span>
     <button class="link" id="open-mods" type="button">Buka folder mod</button>
@@ -62,6 +63,21 @@
       <p id="reinc-foot" class="reinc-foot" hidden>Angka stat adalah nilai dasar pada job sekarang, tanpa bonus perlengkapan, jadi bisa lebih rendah daripada layar status di game.</p>
     </section>
 
+    <section id="view-stat" role="tabpanel" aria-labelledby="tab-stat" hidden>
+      <div class="reinc-head">
+        <div>
+          <h2>Growth dan Multiplier Stat</h2>
+          <p class="reinc-intro">Atur seberapa cepat stat tumbuh saat naik level (growth) dan seberapa besar stat yang ditampilkan dari nilai dasarnya (multiplier), per job atau per karakter. Perubahan hanya berlaku untuk unit Anda; musuh tetap memakai nilai bawaan kecuali Anda mengizinkannya di bawah.</p>
+        </div>
+        <div class="log-actions">
+          <button class="ghost" id="stat-discard" type="button" disabled>Batalkan perubahan</button>
+          <button class="confirm" id="stat-save" type="button" disabled>Simpan</button>
+        </div>
+      </div>
+      <div id="stat-status" class="notices" aria-live="polite"></div>
+      <div id="stat-body"></div>
+    </section>
+
     <section id="view-log" role="tabpanel" aria-labelledby="tab-log" hidden>
       <div class="log-head">
         <div id="log-summary" class="log-summary"></div>
@@ -91,5 +107,6 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="app.js"></script>
+  <script src="stat.js"></script>
 </body>
 </html>
