@@ -189,7 +189,7 @@ function renderStat() {
 const presetForm = { scope: "generic", stats: statValues(true), growthPercent: 100, multiplierPercent: 100, moveBonus: 0, jumpBonus: 0 };
 let pendingPreset = null;
 
-async function applyPreset() {
+async function applyPreset(growthPercent, multiplierPercent) {
   const stats = STAT_NAMES.flatMap((_, i) => presetForm.stats[i] ? [i] : []);
   if (!stats.length && !presetForm.moveBonus && !presetForm.jumpBonus) return toast("Pilih setidaknya satu stat, atau isi tambahan Move atau Jump.");
   if (pendingPreset) return;
@@ -198,7 +198,8 @@ async function applyPreset() {
   updateStatButtons();
   const sent = draftKey(statDraft);
   try {
-    const rules = await call("applyStatPreset", { rules: rulesFrom(statDraft), preset: { ...presetForm, stats } });
+    const preset = { ...presetForm, stats, growthPercent, multiplierPercent };
+    const rules = await call("applyStatPreset", { rules: rulesFrom(statDraft), preset });
     if (request !== pendingPreset) return;
     if (draftKey(statDraft) !== sent) {
       toast("Draf berubah saat preset dihitung. Terapkan lagi untuk memakai draf terbaru.");
@@ -206,7 +207,10 @@ async function applyPreset() {
     }
     statDraft = draftFrom(rules);
     renderStat();
-    toast(draftKey(statDraft) === sent ? "Draf sudah sesuai dengan preset." : "Preset diterapkan ke draf.", true);
+    const job = stat.jobs.find(j => j.job === statJob);
+    const inScope = job && (job.group === preset.scope || (preset.scope === "both" && job.group !== "monster"));
+    const message = draftKey(statDraft) === sent ? "Draf sudah sesuai dengan preset." : "Preset diterapkan ke draf.";
+    toast(inScope ? message : message + " Job yang sedang ditampilkan berada di luar cakupan.", true);
   } catch (error) {
     if (request === pendingPreset) toast(error.message);
   } finally {
@@ -234,12 +238,12 @@ function renderPreset() {
   const quick = (label, growth, multiplier, names, moveBonus = 0) => el("button", { type: "button", class: "ghost", text: label,
     onclick: () => {
       presetForm.stats = STAT_NAMES.map(name => !names || names.includes(name));
-      presetForm.growthPercent = growth;
-      presetForm.multiplierPercent = multiplier;
+      if (growth !== null) presetForm.growthPercent = growth;
+      if (multiplier !== null) presetForm.multiplierPercent = multiplier;
       presetForm.moveBonus = moveBonus;
       presetForm.jumpBonus = 0;
       renderStat();
-      applyPreset();
+      applyPreset(growth, multiplier);
     } });
   return el("article", { class: "card stat-card preset-card" },
     el("div", { class: "stat-card-head" }, el("h3", { text: "Preset" }),
@@ -247,22 +251,22 @@ function renderPreset() {
         onclick: () => { pendingPreset = null; statDraft.jobs = {}; renderStat(); } })),
     el("p", { class: "stat-help", text: "Preset memakai nilai bawaan tiap job. Pilih cakupan, lalu gunakan preset cepat atau atur sendiri. Tekan Simpan untuk menyimpan draf." }),
     el("label", { class: "preset-scope" }, "Cakupan", scope),
-    el("div", { class: "preset-quick" }, quick("Tumbuh 25% lebih cepat", 125, 100),
-      quick("Tumbuh 50% lebih cepat", 150, 100), quick("HP dan MP +20%", 100, 120, ["HP", "MP"]),
-      quick("Semua stat +10%", 100, 110), quick("Move +1", 100, 100, null, 1)),
+    el("div", { class: "preset-quick" }, quick("Tumbuh 25% lebih cepat", 125, null),
+      quick("Tumbuh 50% lebih cepat", 150, null), quick("HP dan MP +20%", null, 120, ["HP", "MP"]),
+      quick("Semua stat +10%", null, 110), quick("Move +1", null, null, null, 1)),
     el("form", { class: "preset-form", onsubmit: e => {
       e.preventDefault();
       presetForm.growthPercent = Number(presetForm.growthPercent);
       presetForm.multiplierPercent = Number(presetForm.multiplierPercent);
       presetForm.moveBonus = Number(presetForm.moveBonus);
       presetForm.jumpBonus = Number(presetForm.jumpBonus);
-      applyPreset();
+      applyPreset(presetForm.growthPercent, presetForm.multiplierPercent);
     } },
       el("fieldset", {}, el("legend", { text: "Stat" }), el("div", { class: "preset-checks" }, checks)),
       el("div", { class: "preset-values" }, percent("Kecepatan tumbuh (%)", "growthPercent"),
         percent("Multiplier (%)", "multiplierPercent"), bonus("Move (tambahan)", "moveBonus"), bonus("Jump (tambahan)", "jumpBonus"),
         el("button", { class: "ghost", type: "submit", text: "Terapkan ke draf" })),
-      el("p", { class: "stat-help", text: "Persentase 25 sampai 400; pada 100%, kolom tersebut tetap seperti di draf. Move dan Jump ditambahkan ke nilai dasar tiap job (-3 sampai +5); 0 berarti tidak diubah." })));
+      el("p", { class: "stat-help", text: "Isi 25–400%. Pada 100%, stat yang dicentang kembali ke nilai bawaan untuk kolom itu. Tambahan Move dan Jump berkisar dari -3 sampai +5. Isi 0 untuk mempertahankan draf gerak." })));
 }
 
 function renderJobEditor() {
@@ -303,14 +307,14 @@ function renderJobEditor() {
     el("div", { class: "stat-card-head" }, el("h3", { text: "Per job" }),
       el("button", { class: "setting-reset", type: "button", text: "Kembalikan job ini ke bawaan",
         onclick: () => { delete statDraft.jobs[statJob]; renderStat(); } })),
-    el("p", { class: "stat-help", text: "Berlaku untuk semua unit Anda yang sedang memakai job ini. Kosongkan kolom untuk memakai nilai bawaan." }),
+    el("p", { class: "stat-help", text: "Bawaan adalah angka asli game. Kolom draf menunjukkan hasil preset dan bisa diedit. Angka growth yang lebih kecil membuat stat tumbuh lebih cepat. Kosongkan isian untuk memakai nilai bawaan." }),
     select,
     el("table", { class: "stat-table" },
       el("thead", {},
         el("tr", {}, el("th", { rowspan: "2", text: "Stat" }), el("th", { colspan: "2", class: "group", text: "Growth" }),
           el("th", { colspan: "2", class: "group", text: "Multiplier" })),
-        el("tr", {}, el("th", { class: "num", text: "bawaan" }), el("th", { text: "baru" }),
-          el("th", { class: "num", text: "bawaan" }), el("th", { text: "baru" }))),
+        el("tr", {}, el("th", { class: "num", text: "bawaan" }), el("th", { text: "draf" }),
+          el("th", { class: "num", text: "bawaan" }), el("th", { text: "draf (%)" }))),
       el("tbody", {}, rows)),
     movementRows.length
       ? el("table", { class: "stat-table stat-movement" },
