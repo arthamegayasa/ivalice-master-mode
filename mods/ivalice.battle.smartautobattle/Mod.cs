@@ -41,16 +41,18 @@ public unsafe class Mod : ModBase // <= Do not Remove.
 
     private readonly IReloadedHooks? _hooks;
     private readonly ILogger _logger;
-    private Config _configuration;
+    private volatile Config _configuration;
 
     private IHook<RefreshControl>? _refreshControlHook;
     private byte* _unitTable;
     private volatile PlannerSettings _settings;
     private volatile bool _active;
-    private volatile bool _debugLog;
     private bool _xinputAvailable = true;
+    private bool _reportedFailure;
 
-    /// <summary>Slots whose current auto-battle mode was written by this mod, so it can be taken back.</summary>
+    // Touched only on the game's thread, inside the hook.
+    private bool _wasActive;
+    /// <summary>Slots whose auto-battle mode this mod wrote, so it can be taken back when switched off.</summary>
     private readonly bool[] _ordered = new bool[BattleLayout.Capacity];
 
     public Mod(ModContext context)
@@ -60,7 +62,6 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         _configuration = context.Configuration;
         _settings = ToSettings(_configuration);
         _active = _configuration.ActiveAtStart;
-        _debugLog = _configuration.DebugLog;
 
         if (_hooks is null || !context.ModLoader.GetController<IStartupScanner>().TryGetTarget(out var scanner))
         {
@@ -72,72 +73,86 @@ public unsafe class Mod : ModBase // <= Do not Remove.
 
         scanner.AddMainModuleScan(UnitTablePattern, result =>
         {
-            if (!result.Found)
-            {
-                _logger.WriteLine($"{Tag} Battle unit table not found. The game version is probably unsupported; the mod is inactive.");
-                return;
-            }
+            if (!result.Found) return;
             var lea = (byte*)(gameBase + result.Offset + UnitTableLeaOffset);
             _unitTable = lea + 7 + *(int*)(lea + 3);
-            _logger.WriteLine($"{Tag} Battle unit table at 0x{(nint)_unitTable:X}.");
         });
 
+        // Registered second, so the table scan above has already run when this one reports.
         scanner.AddMainModuleScan(RefreshControlPattern, result =>
         {
-            if (!result.Found)
+            if (!result.Found || _unitTable == null)
             {
-                _logger.WriteLine($"{Tag} Control refresh function not found. The game version is probably unsupported; the mod is inactive.");
+                _logger.WriteLine($"{Tag} Could not find the game code this mod relies on (unit table: {(_unitTable != null ? "found" : "missing")}, control refresh: {(result.Found ? "found" : "missing")}). The game version is probably unsupported; the mod is inactive.");
                 return;
             }
-            var address = gameBase + result.Offset;
-            _refreshControlHook = _hooks.CreateHook<RefreshControl>(RefreshControlImpl, address).Activate();
-            _logger.WriteLine($"{Tag} Hooked control refresh at 0x{address:X}. Auto battle is {(_active ? "ON" : "OFF")}; toggle with F8 or L3+R3.");
-        });
 
-        new Thread(WatchToggle) { IsBackground = true, Name = "SmartAutoBattle toggle" }.Start();
+            var address = gameBase + result.Offset;
+            _refreshControlHook = _hooks.CreateHook<RefreshControl>(RefreshControlImpl, address);
+            _refreshControlHook.Activate();
+            _logger.WriteLine($"{Tag} Ready: unit table at 0x{(nint)_unitTable:X}, control refresh hooked at 0x{address:X}. Auto battle is {(_active ? "ON" : "OFF")}; toggle with F8 or L3+R3.");
+
+            new Thread(WatchToggle) { IsBackground = true, Name = "SmartAutoBattle toggle" }.Start();
+        });
     }
 
     private void RefreshControlImpl(nint sceneUnit)
     {
         // Runs on the game's own thread, once per step of the acting unit's turn.
-        if (sceneUnit != 0 && _unitTable != null)
+        // Nothing here may throw: an exception would unwind into the game's native code.
+        try
         {
-            var unit = *(byte**)(sceneUnit + SceneUnitPointer);
-            var offset = unit - _unitTable;
-            if (unit != null && offset >= 0 && offset < BattleLayout.TableSize && offset % BattleLayout.Stride == 0)
-                Apply(unit, (int)(offset / BattleLayout.Stride));
+            if (sceneUnit != 0) Apply(*(byte**)(sceneUnit + SceneUnitPointer));
+        }
+        catch (Exception e)
+        {
+            if (!_reportedFailure) _logger.WriteLine($"{Tag} Unexpected error, the unit was left alone: {e.Message}");
+            _reportedFailure = true;
         }
 
         _refreshControlHook!.OriginalFunction(sceneUnit);
     }
 
-    private void Apply(byte* unit, int slot)
+    private void Apply(byte* unit)
     {
-        ref var mode = ref unit[BattleLayout.AutoMode];
-        ref var target = ref unit[BattleLayout.AutoTarget];
-
-        if (!_active)
+        var active = _active;
+        if (!active)
         {
-            // Give back only what this mod handed out; a mode the player picked in the menu stays.
-            if (_ordered[slot] && mode is AutoMode.Fight or AutoMode.SaveFadingLife)
-            {
-                mode = AutoMode.None;
-                if (_debugLog) _logger.WriteLine($"{Tag} Unit {slot}: back to manual.");
-            }
-            _ordered[slot] = false;
+            // Switched off: take back every order at once, so nothing lingers into a later battle.
+            if (_wasActive) ReleaseAll();
+            _wasActive = false;
             return;
         }
+        _wasActive = true;
+
+        var offset = unit - _unitTable;
+        if (unit == null || offset < 0 || offset >= BattleLayout.TableSize || offset % BattleLayout.Stride != 0) return;
+        var slot = (int)(offset / BattleLayout.Stride);
 
         var order = AutoBattlePlanner.Plan(new ReadOnlySpan<byte>(_unitTable, BattleLayout.TableSize), slot, _settings);
         if (order is not { } o) return;
 
-        if (_debugLog && (mode != o.Mode || !_ordered[slot]))
+        if (_configuration.DebugLog && (unit[BattleLayout.AutoMode] != o.Mode || unit[BattleLayout.AutoTarget] != o.Target))
             _logger.WriteLine($"{Tag} Unit {slot}: {(o.Mode == AutoMode.SaveFadingLife ? "save" : "fight")} -> unit {o.Target}.");
 
-        // The game keeps its own target up to date while fighting, so only aim again when the mode changes.
-        if (mode != o.Mode || o.Mode == AutoMode.SaveFadingLife) target = o.Target;
-        mode = o.Mode;
+        unit[BattleLayout.AutoTarget] = o.Target;
+        unit[BattleLayout.AutoMode] = o.Mode;
         _ordered[slot] = true;
+    }
+
+    /// <summary>Returns to manual every unit this mod ordered, leaving modes the player picked in the menu.</summary>
+    private void ReleaseAll()
+    {
+        for (var slot = 0; slot < BattleLayout.Capacity; slot++)
+        {
+            if (!_ordered[slot]) continue;
+            _ordered[slot] = false;
+
+            var unit = _unitTable + slot * BattleLayout.Stride;
+            if (unit[BattleLayout.InUse] != BattleLayout.EmptySlot && AutoBattlePlanner.IsHandedOut(unit[BattleLayout.AutoMode]))
+                unit[BattleLayout.AutoMode] = AutoMode.None;
+        }
+        if (_configuration.DebugLog) _logger.WriteLine($"{Tag} All units returned to manual.");
     }
 
     private void WatchToggle()
@@ -163,7 +178,9 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         GetWindowThreadProcessId(GetForegroundWindow(), out var foregroundProcess);
         if (foregroundProcess != (uint)Environment.ProcessId) return false;
 
-        if (config.ToggleWithF8 && (GetAsyncKeyState(VkF8) & 0x8000) != 0) return true;
+        // With both toggles switched off there would be no way to take control back, so F8 stays.
+        var f8Enabled = config.ToggleWithF8 || !config.ToggleWithSticks;
+        if (f8Enabled && (GetAsyncKeyState(VkF8) & 0x8000) != 0) return true;
 
         if (config.ToggleWithSticks && _xinputAvailable)
         {
@@ -188,7 +205,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         if (config.HealWithWhiteMagicks) healers.Add(Skillsets.WhiteMagicks);
         if (config.HealWithItems) healers.Add(Skillsets.Items);
         if (config.HealWithMartialArts) healers.Add(Skillsets.MartialArts);
-        return new PlannerSettings(config.HealThresholdPercent, healers);
+        return new PlannerSettings(config.HealThresholdPercent, healers, config.ReviveFallenAllies);
     }
 
     #region Standard Overrides
@@ -196,7 +213,6 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     {
         _configuration = configuration;
         _settings = ToSettings(configuration);
-        _debugLog = configuration.DebugLog;
         _logger.WriteLine($"{Tag} Settings updated: heal below {_settings.EffectiveThreshold}%.");
     }
     #endregion

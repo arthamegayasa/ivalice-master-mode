@@ -32,6 +32,8 @@ public static class BattleLayout
     public const byte CrystalBit = 0x40;
     public const byte KoBit = 0x20;
     /// <summary>In the second status byte.</summary>
+    public const byte PetrifyBit = 0x80;
+    /// <summary>In the second status byte.</summary>
     public const byte TreasureBit = 0x01;
 
     /// <summary>The auto-battle mode the in-game menu writes; 0 means none.</summary>
@@ -40,11 +42,13 @@ public static class BattleLayout
     public const int AutoTarget = 0x1ED;
 }
 
-/// <summary>Values of the auto-battle mode byte, in the order of the in-game Auto-battle menu.</summary>
+/// <summary>
+/// Values of the auto-battle mode byte. The game treats any non-zero value as "driven by the AI"
+/// and branches on these four; the names follow the original game's Auto-battle menu.
+/// </summary>
 public static class AutoMode
 {
     public const byte None = 0x00;
-    public const byte Manual = 0x0A;
     public const byte Fight = 0x0C;
     public const byte ProtectAllies = 0x0E;
     public const byte SaveFadingLife = 0x10;
@@ -64,7 +68,9 @@ public readonly record struct AutoOrder(byte Mode, byte Target);
 
 /// <param name="HealThresholdPercent">A healer saves an ally whose HP is below this share of its maximum.</param>
 /// <param name="HealerSkillsets">A unit with one of these as primary or secondary skillset is a healer.</param>
-public sealed record PlannerSettings(int HealThresholdPercent, IReadOnlySet<byte> HealerSkillsets)
+/// <param name="ReviveFallenAllies">Whether a knocked-out ally is a reason for a healer to stop fighting.</param>
+public sealed record PlannerSettings(
+    int HealThresholdPercent, IReadOnlySet<byte> HealerSkillsets, bool ReviveFallenAllies = true)
 {
     /// <summary>
     /// The game's own "save fading life" search only reacts below half HP, so a higher threshold
@@ -87,20 +93,29 @@ public static class AutoBattlePlanner
         var own = unit[BattleLayout.PermanentFlags];
         if ((own & BattleLayout.TeamMask) != 0 || (own & BattleLayout.ControlBit) == 0) return null;
 
-        // Anything other than "none" or the two modes this mod hands out was picked by the player in the menu.
+        // Any other mode was picked by the player in the in-game menu, so it is theirs to keep.
         var mode = unit[BattleLayout.AutoMode];
-        if (mode is not (AutoMode.None or AutoMode.Fight or AutoMode.SaveFadingLife)) return null;
+        if (mode != AutoMode.None && !IsHandedOut(mode)) return null;
 
         var isHealer = settings.HealerSkillsets.Contains(unit[BattleLayout.PrimarySkillset])
                        || settings.HealerSkillsets.Contains(unit[BattleLayout.SecondarySkillset]);
-        if (isHealer && FindAllyToSave(table, slot, settings.EffectiveThreshold) is { } ally)
+        if (isHealer && FindAllyToSave(table, slot, settings) is { } ally)
             return new AutoOrder(AutoMode.SaveFadingLife, (byte)ally);
+
+        // Stay on the enemy the unit is already fighting; pick another only when that one is no longer a target.
+        var aimedAt = unit[BattleLayout.AutoTarget];
+        if (mode == AutoMode.Fight && aimedAt < BattleLayout.Capacity && IsLivingEnemy(Unit(table, aimedAt)))
+            return new AutoOrder(AutoMode.Fight, aimedAt);
 
         return FindEnemy(table) is { } enemy ? new AutoOrder(AutoMode.Fight, (byte)enemy) : null;
     }
 
-    private static int? FindAllyToSave(ReadOnlySpan<byte> table, int self, int thresholdPercent)
+    /// <summary>Whether a mode is one this mod writes, and so one it clears again when switched off.</summary>
+    public static bool IsHandedOut(byte mode) => mode is AutoMode.Fight or AutoMode.SaveFadingLife;
+
+    private static int? FindAllyToSave(ReadOnlySpan<byte> table, int self, PlannerSettings settings)
     {
+        var thresholdPercent = settings.EffectiveThreshold;
         int? best = null;
         long bestHp = 0, bestMax = 1;
 
@@ -110,7 +125,11 @@ public static class AutoBattlePlanner
             var unit = Unit(table, slot);
             if (!IsPresent(unit) || IsGone(unit) || (unit[BattleLayout.PermanentFlags] & BattleLayout.TeamMask) != 0) continue;
 
-            if (IsKo(unit)) return slot;
+            if (IsKo(unit))
+            {
+                if (settings.ReviveFallenAllies) return slot;
+                continue;
+            }
 
             long hp = ReadU16(unit, BattleLayout.Hp), max = ReadU16(unit, BattleLayout.MaxHp);
             if (max == 0 || hp * 100 >= thresholdPercent * max) continue;
@@ -124,14 +143,14 @@ public static class AutoBattlePlanner
     private static int? FindEnemy(ReadOnlySpan<byte> table)
     {
         for (var slot = 0; slot < BattleLayout.Capacity; slot++)
-        {
-            var unit = Unit(table, slot);
-            if (IsPresent(unit) && !IsKo(unit) && !IsGone(unit)
-                && (unit[BattleLayout.PermanentFlags] & BattleLayout.TeamMask) != 0)
-                return slot;
-        }
+            if (IsLivingEnemy(Unit(table, slot))) return slot;
         return null;
     }
+
+    private static bool IsLivingEnemy(ReadOnlySpan<byte> unit) =>
+        IsPresent(unit) && !IsKo(unit) && !IsGone(unit)
+        && (unit[BattleLayout.Statuses + 1] & BattleLayout.PetrifyBit) == 0
+        && (unit[BattleLayout.PermanentFlags] & BattleLayout.TeamMask) != 0;
 
     private static ReadOnlySpan<byte> Unit(ReadOnlySpan<byte> table, int slot) =>
         table.Slice(slot * BattleLayout.Stride, BattleLayout.Stride);

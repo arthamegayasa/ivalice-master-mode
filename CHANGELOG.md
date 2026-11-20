@@ -11,21 +11,28 @@ Pre-release: Smart Auto Battle has not been tested inside a battle yet.
 - **Smart Auto Battle** (`ivalice.battle.smartautobattle`), a Reloaded-II mod that hands the player's units to the game's own auto-battle:
   - healers (White Magicks or Items users by default) switch to Save Fading Life when an ally is knocked out or below the heal threshold;
   - every other unit, and healers with nobody to help, use Fight for Life;
-  - F8 or L3 + R3 toggles it during play, with a beep;
-  - modes picked in the in-game Auto-battle menu, guests and enemies are left alone.
-- Control Center: a "Pertarungan" group with Smart Auto Battle's settings (active at start, heal threshold, which skillsets are healers, toggle options).
+  - a fighting unit stays on its enemy and is aimed again when that enemy is down, petrified or gone;
+  - F8 or L3 + R3 toggles it during play, with a beep, and switching off returns every unit it ordered to manual;
+  - Protect Allies and Run Like a Rabbit picked in the in-game menu, guests and enemies are left alone.
+- Control Center: a "Pertarungan" group with Smart Auto Battle's settings (active at start, heal threshold, which skillsets are healers, whether healers revive, toggle options).
 - The install script builds and installs Smart Auto Battle.
 - [docs/smart-auto-battle.md](docs/smart-auto-battle.md): how the mod works and the disassembly evidence behind it.
 
 ### Verified
 
 - The mod loads in the game, resolves the battle unit table and installs its hook at the addresses found by static analysis; the game stayed responsive at the title screen for 60 seconds.
-- 23 tests cover the decision logic; the hook patterns each match exactly once in the executable.
+- 39 tests cover the decision logic; the hook patterns each match exactly once in the executable.
 
 ### Not verified
 
 - Any behaviour inside a battle: units acting on their own, healers healing, toggling, story battles with guests, suspend saves.
-- The names of the game's auto-battle modes are inferred from the original game's menu order.
+- The names of the game's auto-battle modes and the meaning of individual status bits are inferred from the original game.
+
+### Known limits
+
+- While the mod is on, choosing Manual in the in-game Auto-battle menu does not stick; use the toggle instead.
+- The on/off state lasts until toggled or until the game closes; it is not reset per battle.
+- A healer does not count itself as someone to save, and the heal threshold cannot exceed 50%.
 
 ## [0.1.0] - 2026-11-20
 

@@ -30,8 +30,13 @@ public class Config : Configurable<Config>
     [DefaultValue(false)]
     public bool HealWithMartialArts { get; set; } = false;
 
+    [DisplayName("Healers revive fallen allies")]
+    [Description("A knocked-out ally makes a healer stop fighting. Turn off if your healers carry no Phoenix Down and know no Raise.")]
+    [DefaultValue(true)]
+    public bool ReviveFallenAllies { get; set; } = true;
+
     [DisplayName("Toggle with F8")]
-    [Description("Press F8 while the game window is focused to switch Smart Auto Battle on or off.")]
+    [Description("Press F8 while the game window is focused to switch Smart Auto Battle on or off. F8 always works when the stick toggle is off.")]
     [DefaultValue(true)]
     public bool ToggleWithF8 { get; set; } = true;
 

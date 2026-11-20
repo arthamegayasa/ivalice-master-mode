@@ -174,6 +174,7 @@ try {
 
     Write-Step 'Smart Auto Battle (this repository)'
     $ownMod = 'ivalice.battle.smartautobattle'
+    # A first install switches the mod on; after that the player's own on/off choice is kept.
     $alreadyThere = Test-Path (Join-Path $modsDir $ownMod)
     & $dotnet build (Join-Path $repo "mods\$ownMod") -c Release --nologo -v q | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Building Smart Auto Battle failed. Close the game if it is running and try again.' }

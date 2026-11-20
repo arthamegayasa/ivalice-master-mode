@@ -16,7 +16,8 @@ internal sealed class Field
     private Span<byte> Unit(int slot) => Table.AsSpan(slot * BattleLayout.Stride, BattleLayout.Stride);
 
     public Field Add(int slot, bool enemy = false, bool playerControlled = true, int hp = 100, int maxHp = 100,
-        byte primary = 0, byte secondary = 0, byte mode = 0, bool ko = false, bool crystal = false, bool treasure = false)
+        byte primary = 0, byte secondary = 0, byte mode = 0, byte target = 0, bool ko = false, bool crystal = false,
+        bool treasure = false, bool petrified = false)
     {
         var unit = Unit(slot);
         unit[BattleLayout.InUse] = (byte)slot;
@@ -28,6 +29,8 @@ internal sealed class Field
         unit[BattleLayout.PrimarySkillset] = primary;
         unit[BattleLayout.SecondarySkillset] = secondary;
         unit[BattleLayout.AutoMode] = mode;
+        unit[BattleLayout.AutoTarget] = target;
+        if (petrified) unit[BattleLayout.Statuses + 1] |= BattleLayout.PetrifyBit;
         if (ko) unit[BattleLayout.Statuses] |= BattleLayout.KoBit;
         if (crystal) unit[BattleLayout.Statuses] |= BattleLayout.CrystalBit;
         if (treasure) unit[BattleLayout.Statuses + 1] |= BattleLayout.TreasureBit;
@@ -159,14 +162,109 @@ public class AutoBattlePlannerTests
     }
 
     [Theory]
-    [InlineData(AutoMode.Manual)]
     [InlineData(AutoMode.ProtectAllies)]
     [InlineData(AutoMode.RunLikeARabbit)]
-    public void A_mode_the_player_picked_in_the_menu_is_left_alone(byte chosen)
+    [InlineData((byte)0x0A)]
+    public void A_mode_this_mod_never_hands_out_is_left_alone(byte chosen)
     {
         var field = new Field().Add(0, mode: chosen).Add(6, enemy: true);
 
         Assert.Null(field.Plan(0));
+    }
+
+    [Fact]
+    public void A_fighter_keeps_the_enemy_it_is_already_aimed_at()
+    {
+        var field = new Field()
+            .Add(0, mode: AutoMode.Fight, target: 7)
+            .Add(6, enemy: true)
+            .Add(7, enemy: true);
+
+        Assert.Equal(new AutoOrder(AutoMode.Fight, 7), field.Plan(0));
+    }
+
+    [Theory]
+    [InlineData(7)]   // knocked out
+    [InlineData(1)]   // an ally
+    [InlineData(9)]   // empty slot
+    [InlineData(200)] // not a slot at all
+    public void A_fighter_aimed_at_something_that_is_not_a_living_enemy_is_aimed_again(byte staleTarget)
+    {
+        var field = new Field()
+            .Add(0, mode: AutoMode.Fight, target: staleTarget)
+            .Add(1)
+            .Add(6, enemy: true)
+            .Add(7, enemy: true, ko: true);
+
+        Assert.Equal(new AutoOrder(AutoMode.Fight, 6), field.Plan(0));
+    }
+
+    [Fact]
+    public void A_healer_goes_back_to_fighting_once_nobody_needs_saving()
+    {
+        var field = new Field()
+            .Add(0, primary: Skillsets.WhiteMagicks, mode: AutoMode.SaveFadingLife, target: 1)
+            .Add(1, hp: 90)
+            .Add(6, enemy: true);
+
+        Assert.Equal(new AutoOrder(AutoMode.Fight, 6), field.Plan(0));
+    }
+
+    [Fact]
+    public void Petrified_enemies_are_not_picked_while_another_enemy_stands()
+    {
+        var field = new Field().Add(0).Add(5, enemy: true, petrified: true).Add(6, enemy: true);
+
+        Assert.Equal(new AutoOrder(AutoMode.Fight, 6), field.Plan(0));
+    }
+
+    [Fact]
+    public void Healers_can_be_told_not_to_chase_knocked_out_allies()
+    {
+        var field = new Field()
+            .Add(0, primary: Skillsets.Items)
+            .Add(1, hp: 0, ko: true)
+            .Add(2, hp: 20)
+            .Add(6, enemy: true);
+        var noRevive = Field.Defaults with { ReviveFallenAllies = false };
+
+        Assert.Equal(new AutoOrder(AutoMode.SaveFadingLife, 2), field.Plan(0, noRevive));
+        Assert.Equal(new AutoOrder(AutoMode.SaveFadingLife, 1), field.Plan(0));
+    }
+
+    [Fact]
+    public void A_threshold_above_half_is_treated_as_half_when_planning()
+    {
+        var field = new Field().Add(0, primary: Skillsets.WhiteMagicks).Add(1, hp: 60).Add(6, enemy: true);
+
+        Assert.Equal(AutoMode.Fight, field.Plan(0, Field.Defaults with { HealThresholdPercent = 90 })!.Value.Mode);
+    }
+
+    [Fact]
+    public void An_ally_with_no_maximum_hp_recorded_is_not_treated_as_wounded()
+    {
+        var field = new Field().Add(0, primary: Skillsets.WhiteMagicks).Add(1, hp: 0, maxHp: 0).Add(6, enemy: true);
+
+        Assert.Equal(AutoMode.Fight, field.Plan(0)!.Value.Mode);
+    }
+
+    [Fact]
+    public void A_healer_with_someone_to_save_gets_an_order_even_when_no_enemy_stands()
+    {
+        var field = new Field().Add(0, primary: Skillsets.WhiteMagicks).Add(1, hp: 5).Add(6, enemy: true, ko: true);
+
+        Assert.Equal(new AutoOrder(AutoMode.SaveFadingLife, 1), field.Plan(0));
+    }
+
+    [Theory]
+    [InlineData(AutoMode.Fight, true)]
+    [InlineData(AutoMode.SaveFadingLife, true)]
+    [InlineData(AutoMode.None, false)]
+    [InlineData(AutoMode.ProtectAllies, false)]
+    [InlineData(AutoMode.RunLikeARabbit, false)]
+    public void Only_the_two_modes_this_mod_hands_out_are_taken_back(byte mode, bool takenBack)
+    {
+        Assert.Equal(takenBack, AutoBattlePlanner.IsHandedOut(mode));
     }
 
     [Fact]

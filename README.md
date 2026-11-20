@@ -26,9 +26,9 @@ This project's own mod. When a fight starts, your units act on their own using t
 - a unit with a healing skillset (White Magicks or Items by default) saves an ally who is knocked out or below the heal threshold;
 - everyone else, and healers when nobody needs help, fights.
 
-Press **F8** or click both sticks (**L3 + R3**) to switch it off and on during play; a high beep means on, a low beep means off. A mode you pick yourself in the game's Auto-battle menu is left alone, and guests and enemies are never touched. The heal threshold and which skillsets count as healers are set in the Control Center.
+Press **F8** or click both sticks (**L3 + R3**) to switch it off and on during play; a high beep means on, a low beep means off. That is the way to take control back: while the mod is on, choosing Manual in the game's Auto-battle menu does not stick. Protect Allies and Run Like a Rabbit picked in that menu are left alone, and guests and enemies are never touched. The heal threshold and which skillsets count as healers are set in the Control Center.
 
-**Status: not yet tested in a battle.** The mod loads, finds its hook and leaves the game stable at the title screen, and its decision logic is covered by tests, but nobody has played a fight with it. Save first, and try it in a random battle before a story battle. [How it works](docs/smart-auto-battle.md) lists the evidence and what is still unconfirmed.
+**Status: not yet tested in a battle.** The mod loads, finds its hook and leaves the game stable at the title screen, and its decision logic is covered by tests, but nobody has played a fight with it. Save first, and try it in a random battle before a story battle. [How it works](docs/smart-auto-battle.md) lists the evidence, the known limits and what is still unconfirmed.
 
 ## Mods in the catalog
 
