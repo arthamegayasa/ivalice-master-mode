@@ -35,6 +35,9 @@ public sealed record RosterDocument(
     IReadOnlyList<UnitEntry> Units)
 {
     public const int CurrentSchema = 1;
+
+    /// <summary>The minimum level the mod is set to require.</summary>
+    public int MinimumLevel { get; init; } = ReincarnationRules.DefaultMinimumLevel;
 }
 
 /// <summary>command.json: a request from the Control Center.</summary>

@@ -59,10 +59,11 @@ public static class CommandProcessor
     /// The record is prepared on a copy and written back in one piece, after the journal line is safe.
     /// </summary>
     /// <param name="roster">The game's roster table. Only the one record is written, and only on success.</param>
+    /// <param name="battleTable">The game's battle unit table. On success, a leftover battle copy of the unit gets the same level, experience and raw stats.</param>
     /// <param name="fileTime">When the command file was written; used when the command carries no time of its own.</param>
     /// <param name="safeMode">Check and answer, but never write.</param>
     /// <param name="journal">Stores the journal line and reports whether that worked. Not called in safe mode.</param>
-    public static CommandResult Execute(ReincarnationCommand command, Span<byte> roster, ReadOnlySpan<byte> battleTable,
+    public static CommandResult Execute(ReincarnationCommand command, Span<byte> roster, Span<byte> battleTable,
         ReadOnlySpan<byte> jobTable, GameStatus game, DateTimeOffset now, DateTimeOffset fileTime, bool safeMode,
         Func<JournalEntry, bool> journal, NameResolver? names = null)
     {
@@ -110,6 +111,8 @@ public static class CommandProcessor
         if (!journaled) return Refuse(id, Refusal.JournalFailed, safeMode, now, RosterExport.Describe(live, command.Slot, battleTable, jobTable, game, names));
 
         after.CopyTo(live);
+        var staleBattleCopy = BattleBinding.Find(battleTable, command.Slot);
+        if (staleBattleCopy >= 0) BattleBinding.Mirror(battleTable, staleBattleCopy, live);
         return new CommandResult(command.Id, Ok: true, Applied: true, SafeMode: false, Refusal.None.Code(),
             $"Reincarnated: level {plan.LevelBefore} to 1, Power +{plan.GainPermille / 10.0:0.0}% (total {plan.Stamp.PowerPermille / 10.0:0.0}%).",
             RosterExport.Describe(live, command.Slot, battleTable, jobTable, game, names), Stamp(now));

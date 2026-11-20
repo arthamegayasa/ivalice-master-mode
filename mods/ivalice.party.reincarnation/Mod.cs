@@ -283,7 +283,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     {
         var config = _configuration;
         var roster = new Span<byte>(_roster, RosterLayout.TableSize);
-        var battleTable = new ReadOnlySpan<byte>(_battleTable, BattleBinding.TableSize);
+        var battleTable = new Span<byte>(_battleTable, BattleBinding.TableSize);
+        ReincarnationRules.UseMinimumLevel(config.MinimumLevel);
         var jobTable = new ReadOnlySpan<byte>(_jobTable, JobTable.TableSize);
 
         var game = GameSafety.Decide(new SafetyInputs(

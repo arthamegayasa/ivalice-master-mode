@@ -2,7 +2,13 @@ namespace Ivalice.Party;
 
 public static class ReincarnationRules
 {
-    public const int MinimumLevel = 10;
+    public const int DefaultMinimumLevel = 10;
+
+    /// <summary>The lowest level a unit may reincarnate at. A setting of the mod; the default is 10.</summary>
+    public static int MinimumLevel { get; private set; } = DefaultMinimumLevel;
+
+    /// <summary>Sets the minimum level, kept within 2 to 99 (a level-1 unit has nothing to give up).</summary>
+    public static void UseMinimumLevel(int level) => MinimumLevel = Math.Clamp(level, 2, 99);
     /// <summary>Each level the unit had adds 0.5% to its Power.</summary>
     public const int PermillePerLevel = 5;
     /// <summary>Power stops growing at +100%.</summary>

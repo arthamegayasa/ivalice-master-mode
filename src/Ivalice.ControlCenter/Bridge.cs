@@ -171,7 +171,7 @@ public sealed class Bridge
             commandPending = File.Exists(_paths.CommandFile),
             rules = new
             {
-                minimumLevel = ReincarnationRules.MinimumLevel,
+                minimumLevel = usable ? reading!.Roster!.MinimumLevel : ReincarnationRules.DefaultMinimumLevel,
                 permillePerLevel = ReincarnationRules.PermillePerLevel,
                 maxPowerPermille = ReincarnationRules.MaxPowerPermille,
                 commandMaxAgeSeconds = CommandProcessor.MaxAgeSeconds,

@@ -4,7 +4,7 @@ Reincarnation lets a party member give up its levels in exchange for better star
 
 Everything about the game below was read from `FFT_enhanced.exe` version 1.00 (SHA-256 `937233F7FE76182A665C487C8802F5CEC6662DDD09967E87CD09FB146FC6B5D5`) by static disassembly. Addresses are relative to the image base (RVAs).
 
-**Status: not yet run in the game.** The rules, the file handling and the hook stub are covered by tests that run without the game (see "What has been checked"). Whether the mod loads, reads the right memory and judges "a battle is in progress" correctly has to be confirmed in play; "To confirm in the running game" lists each open point with its cheapest check. Until then, use **Safe mode**, in which the mod answers commands with what it would do and never changes the game.
+**Status: run in the game on one save.** Loading, the roster, the battle check, one real reincarnation, its presence in the next autosave and the Control Center tab were confirmed in play on 2026-11-21 (see "Confirmed in play"). A battle fought by a reincarnated unit and a second reincarnation of the same unit have not been played. **Safe mode** still lets you see what a command would do without changing the game.
 
 ## The rules
 
@@ -191,7 +191,20 @@ Without the game:
 - Breaking a rule on purpose makes the tests fail: eleven such changes were tried (battle check removed, fingerprint ignored, game written before the journal, safe mode writing, and others) and each was caught.
 - The interface was rendered in a browser with sample data produced by `Ivalice.Party`.
 
-## To confirm in the running game
+## Confirmed in play
+
+- Loaded in the game with the other mods: `Self-test passed`, all patterns resolved, roster at image base + `0x11A7D10`. The frame routine only starts running once the game is past its version-select screen.
+- The roster matched the game: names (Ramza, Ealdwine, Patrick, Radcliffe, Giselle, Melusine, Wulfhilda and the guests Delita and Argath), jobs and levels were the same as on the game's Units screen.
+- "Battle in progress" read `false` at the title menu and on the world map, and `true` from the deployment screen through a battle.
+- A real reincarnation on the world map (Giselle, level 4, with the minimum level set to 2 for the test): the game's Units screen showed her at level 1 with 0 experience at once, MP 11 as predicted, and JP and job level unchanged.
+- The game's next autosave, decoded from a copy, held her record at level 1 with the stamp in the spare bytes.
+- From the Control Center: the tab listed the party from the running game, showed the in-battle refusal during deployment, and on the world map the Reinkarnasi button backed up the saves, sent the command and showed the result (Ealdwine, Power +1.5%) while the game window was not focused.
+
+After a battle the game does leave battle copies of the units that fought (`battleUnitsBound` was 4 on the world map, each unit with a `battleSlot`). They no longer block a reincarnation: the mod writes the new level, experience and raw stats into the copy as well (`BattleBinding.Mirror`), so a write-back by the game changes nothing.
+
+## Still to confirm in the running game
+
+The table below is the original checklist; the rows about loading, the roster, names, the battle check, the unfocused window, the refusal in battle and the visible change are confirmed above.
 
 Turn on "Log diagnostik" for the mod first. Each line is one open point and its cheapest check.
 

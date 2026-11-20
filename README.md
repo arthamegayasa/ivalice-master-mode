@@ -43,7 +43,7 @@ This project's second mod, run from the **Reinkarnasi** tab of the Control Cente
 
 The tab lists the party with each character's stats, reincarnation count and Power, and what the next reincarnation would give. Pressing **Reinkarnasi** asks for confirmation, copies the save files to a backup folder, and sends the command to the game, which refuses it during a battle or story scene. The change becomes permanent when the game saves.
 
-**Status: not yet run in the game.** The rules, the file exchange and the hook's register handling are covered by tests that need no game; whether the mod reads the right memory and recognises a battle has to be confirmed in play. The mod has a **safe mode** that answers every command with what it would do and changes nothing; use it first. [How it works](docs/reincarnation.md) has the evidence, the file formats and the list of things to confirm.
+**Status: run in the game on one save.** A character was reincarnated from the Control Center on the world map; the game showed it at level 1 at once and the next autosave held the change. A battle fought by a reincarnated character has not been played through. [How it works](docs/reincarnation.md) has the evidence and the open points.
 
 ## Mods in the catalog
 

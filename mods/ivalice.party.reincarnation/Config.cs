@@ -15,6 +15,11 @@ public class Config : Configurable<Config>
     [DefaultValue(true)]
     public bool ResolveNames { get; set; } = true;
 
+    [DisplayName("Minimum level")]
+    [Description("The lowest level a character may reincarnate at. 2 to 99; the default is 10.")]
+    [DefaultValue(10)]
+    public int MinimumLevel { get; set; } = 10;
+
     [DisplayName("Diagnostic log")]
     [Description("Writes the roster address, every change of the battle check and every command with its outcome to the Reloaded-II log. For troubleshooting only.")]
     [DefaultValue(false)]

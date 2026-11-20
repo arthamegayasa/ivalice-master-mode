@@ -38,7 +38,7 @@ internal sealed class BridgeWorker(BridgePaths paths, string modVersion, int pro
 
     /// <summary>One look at the files: answer a waiting command, then refresh the roster file when due.</summary>
     /// <param name="tickCount">A millisecond counter that never runs backwards.</param>
-    public void Tick(long tickCount, DateTimeOffset now, Span<byte> roster, ReadOnlySpan<byte> battleTable,
+    public void Tick(long tickCount, DateTimeOffset now, Span<byte> roster, Span<byte> battleTable,
         ReadOnlySpan<byte> jobTable, GameStatus game, WorkerSettings settings, NameResolver? names)
     {
         var answered = HandleCommand(now, roster, battleTable, jobTable, game, settings, names);
@@ -48,7 +48,7 @@ internal sealed class BridgeWorker(BridgePaths paths, string modVersion, int pro
     }
 
     /// <returns>True when a command was answered, so the roster file should be refreshed at once.</returns>
-    private bool HandleCommand(DateTimeOffset now, Span<byte> roster, ReadOnlySpan<byte> battleTable,
+    private bool HandleCommand(DateTimeOffset now, Span<byte> roster, Span<byte> battleTable,
         ReadOnlySpan<byte> jobTable, GameStatus game, WorkerSettings settings, NameResolver? names)
     {
         if (!File.Exists(paths.CommandFile)) return false;
@@ -118,7 +118,7 @@ internal sealed class BridgeWorker(BridgePaths paths, string modVersion, int pro
     {
         var units = RosterExport.DescribeAll(roster, battleTable, jobTable, game, names);
         var document = new RosterDocument(RosterDocument.CurrentSchema, modVersion, processId, WrittenAt: "",
-            settings.SafeMode, game, units);
+            settings.SafeMode, game, units) { MinimumLevel = ReincarnationRules.MinimumLevel };
 
         // Written when something changed, and otherwise often enough to show the game is still alive.
         var content = RosterFeed.Serialize(document);

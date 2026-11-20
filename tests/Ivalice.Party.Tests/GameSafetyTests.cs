@@ -118,10 +118,30 @@ public class GameSafetyTests
     }
 
     [Fact]
-    public void An_eligible_unit_is_refused_while_a_battle_copy_of_it_could_be_written_back()
+    public void A_leftover_battle_copy_does_not_make_an_eligible_unit_ineligible_outside_battle()
     {
-        Assert.Equal(Refusal.BoundToBattleUnit,
+        Assert.Equal(Refusal.None,
             GameSafety.Evaluate(Fake.Unit(slot: 5), 5, Fake.BattleTableWith(2, 5, inUse: 0xFF, onField: 0), Fake.WorldMap));
+    }
+
+    [Fact]
+    public void The_minimum_level_is_a_setting_kept_between_2_and_99()
+    {
+        try
+        {
+            ReincarnationRules.UseMinimumLevel(3);
+            Assert.Equal(Refusal.None, Reincarnation.Check(Fake.Unit(slot: 5, level: 3), 5));
+            Assert.Equal(Refusal.LevelTooLow, Reincarnation.Check(Fake.Unit(slot: 5, level: 2), 5));
+
+            ReincarnationRules.UseMinimumLevel(0);
+            Assert.Equal(2, ReincarnationRules.MinimumLevel);
+            ReincarnationRules.UseMinimumLevel(500);
+            Assert.Equal(99, ReincarnationRules.MinimumLevel);
+        }
+        finally
+        {
+            ReincarnationRules.UseMinimumLevel(ReincarnationRules.DefaultMinimumLevel);
+        }
     }
 
     [Fact]

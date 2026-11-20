@@ -35,6 +35,27 @@ public static class BattleBinding
         return -1;
     }
 
+    /// <summary>The fields the game copies between a roster record and its battle unit, in the battle unit.</summary>
+    private const int BattleExperience = 0x28;
+    private const int BattleLevel = 0x29;
+    private const int BattleRawStats = 0x7B;
+    private const int RawStatsLength = 15;
+
+    /// <summary>
+    /// Copies level, experience and raw stats from a roster record into the battle record still tied to
+    /// it. Battle records are not cleared when a fight ends, and the game can write one back over the
+    /// roster at the start of a later scene; with both copies equal that write-back changes nothing.
+    /// Only for use outside battles.
+    /// </summary>
+    public static void Mirror(Span<byte> battleTable, int battleIndex, ReadOnlySpan<byte> record)
+    {
+        if (battleTable.Length != TableSize || battleIndex < 0 || battleIndex >= Capacity || record.Length != RosterLayout.Stride) return;
+        var unit = battleTable.Slice(battleIndex * Stride, Stride);
+        unit[BattleLevel] = record[RosterLayout.Level];
+        unit[BattleExperience] = record[RosterLayout.Experience];
+        record.Slice(RosterLayout.RawStats, RawStatsLength).CopyTo(unit.Slice(BattleRawStats, RawStatsLength));
+    }
+
     public static int CountInUse(ReadOnlySpan<byte> battleTable) => Count(battleTable, unit => unit[InUse] != Empty);
 
     /// <summary>How many battle records the game would still write back into some roster slot.</summary>
@@ -97,6 +118,8 @@ public static class GameSafety
         if (refusal != Refusal.None) return refusal;
         if (game.InBattle) return Refusal.InBattle;
         if (battleTable.Length != BattleBinding.TableSize) return Refusal.GameStateUnknown;
-        return BattleBinding.Find(battleTable, slot) >= 0 ? Refusal.BoundToBattleUnit : Refusal.None;
+        // A battle copy left over from an earlier fight does not block the unit: the change is mirrored
+        // into that copy (see BattleBinding.Mirror), so a later write-back carries the new values.
+        return Refusal.None;
     }
 }

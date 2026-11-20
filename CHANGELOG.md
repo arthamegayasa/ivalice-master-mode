@@ -2,46 +2,48 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [0.4.0] - Unreleased
-
-Pre-release: Reincarnation has not been run in the game yet. Everything listed under "Verified" was checked without the game.
+## [0.4.0] - 2026-11-21
 
 ### Added
 
 - **Reincarnation** (`ivalice.party.reincarnation`), a Reloaded-II mod, and a **Reinkarnasi** tab in Ivalice Control Center to drive it:
-  - a party member of level 10 or higher goes back to level 1 and restarts from the average starting stats of a new recruit, raised by its Power;
+  - a party member of level 10 or higher (the minimum level is a setting) goes back to level 1 and restarts from the average starting stats of a new recruit, raised by its Power;
   - Power grows by 0.5% for every level given up (level 10: +5%, level 99: +49.5%), adds up over reincarnations and stops at +100%;
   - job, JP, abilities, equipment, Brave and Faith are untouched; guests, monsters and units away on an errand cannot reincarnate;
   - the tab lists each character's stats, reincarnation count and Power, and previews the next reincarnation; the preview is computed by the same code that changes the game;
   - a confirmation dialog states what will happen; before the command is sent, every save file is copied to `%LOCALAPPDATA%\IvaliceControlCenter\save-backups` (the 20 newest backups are kept);
-  - the mod refuses a command during a battle or story scene, for a unit the game still holds a battle copy of, when the slot holds another unit than the player confirmed, and when the command is older than two minutes;
+  - the mod refuses a command during a battle or story scene, when the slot holds another unit than the player confirmed, and when the command is older than two minutes;
   - every applied reincarnation is first written to a journal with the unit's record before and after, so it can be undone by hand;
   - count and Power are stored in spare bytes of the unit's own roster record, tied to the unit by a fingerprint, so they travel with the save and a new recruit in a reused slot does not inherit them.
-- Mod settings in the Control Center: **Mode aman** (safe mode: the mod answers with what it would do and changes nothing), "Tampilkan nama karakter" and "Log diagnostik".
+- A battle copy of a unit left over from an earlier fight no longer blocks it: the change is written into that copy as well, so a later write-back by the game carries the new values.
+- Mod settings in the Control Center: "Level minimum" (2 to 99, default 10), **Mode aman** (safe mode: the mod answers with what it would do and changes nothing), "Tampilkan nama karakter" and "Log diagnostik".
 - `src/Ivalice.Party`: the reincarnation rules and the file formats shared by the mod and the app.
 - The install script builds and installs Reincarnation; CI runs its tests and builds it.
 - [docs/reincarnation.md](docs/reincarnation.md): how it works, the disassembly evidence, the file protocol, and the list of things to confirm in the game.
 
 ### Verified
 
-- 184 tests cover the rules, the stamp, eligibility, the battle checks, the roster export, the command processor and the mod's file handling, including records copied from a real save. Eleven deliberate rule breaks (battle check removed, fingerprint ignored, game written before the journal, and others) each made tests fail.
+- 186 tests cover the rules, the stamp, eligibility, the battle checks, the roster export, the command processor and the mod's file handling, including records copied from a real save. Eleven deliberate rule breaks (battle check removed, fingerprint ignored, game written before the journal, and others) each made tests fail.
 - The mod's hook stub, assembled and installed by Reloaded.Hooks on a throwaway native function, hands back `rax`, `rcx`, `rdx`, `r8` to `r11` and `xmm0` to `xmm5` unchanged after running managed code; a stub that calls managed code without saving registers is caught by the same test.
 - Each of the nine byte patterns the mod uses matches exactly once in the code section of `FFT_enhanced.exe` 1.00.
 - The game's battle-to-roster write-back and the party menu's write-back were read in the disassembly: neither writes the spare bytes the stamp uses.
 - The Reinkarnasi tab was rendered in a browser with sample data.
 
+### Confirmed in play
+
+- Loaded in the game with the other mods: `Self-test passed`, all patterns resolved, roster at image base + `0x11A7D10`. The frame routine only starts running once the game is past its version-select screen.
+- The roster matched the game: names (Ramza, Ealdwine, Patrick, Radcliffe, Giselle, Melusine, Wulfhilda and the guests Delita and Argath), jobs and levels were the same as on the game's Units screen.
+- "Battle in progress" read `false` at the title menu and on the world map, and `true` from the deployment screen through a battle.
+- A real reincarnation on the world map (Giselle, level 4, with the minimum level set to 2 for the test): the game's Units screen showed her at level 1 with 0 experience at once, MP 11 as predicted, and JP and job level unchanged.
+- The game's next autosave, decoded from a copy, held her record at level 1 with the stamp in the spare bytes.
+- From the Control Center: the tab listed the party from the running game, showed the in-battle refusal during deployment, and on the world map the Reinkarnasi button backed up the saves, sent the command and showed the result (Ealdwine, Power +1.5%) while the game window was not focused.
+
 ### Not verified
 
-- Anything inside the running game: that the mod loads and its hook is safe there, that the roster and job table are read correctly, that names resolve, and that a reincarnation shows up in the game and survives a battle, a save and a load.
-- The battle-in-progress check. It rests on one static finding (the battle controller object exists exactly while the battle scene routine runs) and has not been observed on the world map versus in a battle.
-- Whether the game leaves battle copies of units behind after a battle. If it does, the mod will refuse those units until the copies are gone.
-- Whether the game keeps running while its window is not focused. If it does not, a command waits until the game is focused again.
-- The Control Center's new bridge methods were not exercised against a running game; the interface was checked with sample data only.
-
-### Known limits
-
-- The stats in the tab are before equipment, so they can be lower than the game's status screen.
-- The change is made in the running game only; it becomes permanent when the game saves, including by autosave.
+- A battle fought by a reincarnated unit, and loading a save that holds one, were not played through; the save file itself was decoded and holds the change.
+- A second reincarnation of the same unit in the game (stacking is covered by tests only).
+- Units returning from a battle with a leftover battle copy were not reincarnated in the game; mirroring the change into that copy is covered by tests only.
+- Story characters other than Ramza.
 
 ## [0.3.0] - 2026-11-20
 
@@ -158,7 +160,7 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
-[0.4.0]: https://github.com/arthamegayasa/ivalice-master-mode/compare/v0.3.0...HEAD
+[0.4.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.4.0
 [0.3.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.3.0
 [0.2.1]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.1
 [0.2.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.2.0

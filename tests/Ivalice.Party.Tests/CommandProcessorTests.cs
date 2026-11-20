@@ -246,12 +246,30 @@ public class CommandProcessorTests
     }
 
     [Fact]
-    public void A_command_is_refused_while_the_game_holds_a_battle_copy_of_the_unit()
+    public void A_leftover_battle_copy_of_the_unit_does_not_block_it_and_receives_the_same_change()
     {
-        var session = new Session { BattleTable = Fake.BattleTableWith(battleSlot: 0, rosterSlot: 1, inUse: 0xFF, onField: 0) };
+        var session = new Session { BattleTable = Fake.BattleTableWith(battleSlot: 3, rosterSlot: 1, inUse: 0xFF, onField: 0) };
+        var copy = 3 * BattleBinding.Stride;
+        session.BattleTable[copy + 0x29] = 30; // the level the unit fought at
+        session.BattleTable[copy + 0x28] = 77;
 
-        Assert.Equal("boundToBattleUnit", session.Run(session.Command(slot: 1)).Reason);
-        Assert.True(session.Run(session.Command(slot: 2)).Applied);
+        Assert.True(session.Run(session.Command(slot: 1)).Applied);
+
+        var record = session.Record(1);
+        Assert.Equal(1, session.BattleTable[copy + 0x29]);
+        Assert.Equal(0, session.BattleTable[copy + 0x28]);
+        Assert.Equal(record.Slice(RosterLayout.RawStats, 15).ToArray(), session.BattleTable.AsSpan(copy + 0x7B, 15).ToArray());
+    }
+
+    [Fact]
+    public void Safe_mode_leaves_a_leftover_battle_copy_alone()
+    {
+        var session = new Session { SafeMode = true, BattleTable = Fake.BattleTableWith(battleSlot: 3, rosterSlot: 1, inUse: 0xFF, onField: 0) };
+        var before = session.BattleTable.ToArray();
+
+        session.Run(session.Command(slot: 1));
+
+        Assert.Equal(before, session.BattleTable);
     }
 
     [Fact]
