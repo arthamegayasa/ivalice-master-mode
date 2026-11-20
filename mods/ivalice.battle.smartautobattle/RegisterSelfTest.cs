@@ -28,6 +28,7 @@ internal static unsafe class RegisterSelfTest
         try
         {
             Marshal.Copy(stub, 0, memory, stub.Length);
+            FlushInstructionCache(GetCurrentProcess(), memory, (nuint)stub.Length);
             *(byte**)(scene + SceneUnitPointer) = unit;
             return ((delegate* unmanaged<nint, nint, int>)memory)(function, (nint)scene) == 1;
         }
@@ -80,4 +81,6 @@ internal static unsafe class RegisterSelfTest
 
     [DllImport("kernel32.dll")] private static extern nint VirtualAlloc(nint address, nuint size, uint type, uint protect);
     [DllImport("kernel32.dll")] private static extern bool VirtualFree(nint address, nuint size, uint type);
+    [DllImport("kernel32.dll")] private static extern nint GetCurrentProcess();
+    [DllImport("kernel32.dll")] private static extern bool FlushInstructionCache(nint process, nint address, nuint size);
 }

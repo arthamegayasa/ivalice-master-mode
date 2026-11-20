@@ -15,7 +15,7 @@ index fb1914c..0e689ed 100644
  
  public class ConfiguratorMixin : ConfiguratorMixinBase
 diff --git a/Mod.cs b/Mod.cs
-index 668c7bf..7c96674 100644
+index 668c7bf..990a172 100644
 --- a/Mod.cs
 +++ b/Mod.cs
 @@ -122,6 +122,7 @@ public class Mod : ModBase
@@ -26,7 +26,7 @@ index 668c7bf..7c96674 100644
              
              if (_hooks != null)
              {
-@@ -221,6 +222,38 @@ public class Mod : ModBase
+@@ -221,6 +222,40 @@ public class Mod : ModBase
          _xpMultiplier = xpMultiplier;
      }
  
@@ -47,7 +47,7 @@ index 668c7bf..7c96674 100644
 +        var lea = (byte*) functionAddress + leaOffset;
 +        if (lea[0] != 0x48 || lea[1] != 0x8D || lea[2] != 0x05)
 +        {
-+            _logger.WriteLine($"[{_modConfig.ModId}] Unit table not found; the multiplier will apply to every unit.", Color.OrangeRed);
++            _logger.WriteLine($"[{_modConfig.ModId}] Unit table not found; with 'Player units only' on, the multiplier will apply to no one.", Color.OrangeRed);
 +            return;
 +        }
 +        _unitTableAddress = (nuint) (lea + 7 + *(int*) (lea + 3));
@@ -57,7 +57,9 @@ index 668c7bf..7c96674 100644
 +    /// <summary>Whether the multiplier applies to the unit in this battle slot.</summary>
 +    private unsafe bool AppliesTo(int id)
 +    {
-+        if (!_configuration.PlayerUnitsOnly || _unitTableAddress == 0 || id < 0 || id >= UnitCount) return true;
++        if (!_configuration.PlayerUnitsOnly) return true;
++        // Without a way to tell the sides apart, multiply for no one rather than for the enemy too.
++        if (_unitTableAddress == 0 || id < 0 || id >= UnitCount) return false;
 +        var flags = *((byte*) _unitTableAddress + id * UnitSize + UnitFlagsOffset);
 +        return (flags & UnitTeamMask) == 0;
 +    }
@@ -65,7 +67,7 @@ index 668c7bf..7c96674 100644
      private unsafe int ProcessXpImpl(int id, Results* results)
      {
          var result = -1;
-@@ -229,7 +262,8 @@ public class Mod : ModBase
+@@ -229,7 +264,8 @@ public class Mod : ModBase
          {
              var memory = Memory.Instance;
              memory.SafeRead(_earnedXpAddress, out byte earnedXp);

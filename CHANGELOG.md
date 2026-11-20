@@ -11,10 +11,17 @@ All notable changes to this project are recorded here. Versions follow [Semantic
   - Fix: Smart Auto Battle hooks the point where the game asks how many logic ticks to run this frame and, for a player-owned unit that the AI is driving, restores the tick count the turbo mod last used.
   - Setting "Keep turbo speed on auto-battle" (on by default) in Ivalice Control Center.
 
+### Changed
+
+- XP Multiplier and Global JP Boost patches: when the game's unit table cannot be located and "Player units only" is on, the multiplier now applies to no one instead of to everyone.
+- The install script no longer switches a mod back on when it rebuilds an older, unpatched copy.
+- If the register self-test fails, the turbo-follow hook is not installed either.
+
 ### Verified
 
 - Measured in one battle with turbo at 6x: the pre-action hold lasted 3037 ms without the setting and 400 to 501 ms with it, switched live in the same battle. With turbo off it stayed at 3037 ms.
-- 50 tests cover the battle logic, including the turbo-follow rules.
+- 53 tests cover the battle logic, including the turbo-follow rules: only the battle states the turbo mod holds back are sped up, never a menu or dialog.
+- An independent review (GPT 6.2 Astra) checked both assembly stubs and the self-test's machine code; its six findings are fixed in this release.
 
 ### Not verified
 

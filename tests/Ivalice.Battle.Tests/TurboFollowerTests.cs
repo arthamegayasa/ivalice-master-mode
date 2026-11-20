@@ -58,10 +58,29 @@ public class TurboFollowerTests
     }
 
     [Fact]
-    public void A_unit_on_auto_is_also_sped_up_in_states_the_game_marks_as_outside_battle_flow()
+    public void A_held_state_is_sped_up_even_when_the_game_tags_it_with_the_menu_context()
     {
-        // The game tags some battle states with context 0; the turbo mod leaves those at normal speed for player units.
         Assert.Equal(6, After(turboSpeed: 6).Adjust(1, context: 0, ConfirmAction, OnAuto));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void A_state_the_turbo_mod_does_not_hold_back_is_never_sped_up(int context)
+    {
+        // For example a pause menu or dialog opened during an auto unit's turn.
+        Assert.Equal(1, After(turboSpeed: 6).Adjust(1, context, ActionPlaying, OnAuto));
+    }
+
+    [Fact]
+    public void With_following_switched_off_nothing_changes_but_turbo_is_still_tracked()
+    {
+        var follower = After(turboSpeed: 6);
+
+        Assert.Equal(1, follower.Adjust(1, Battle, ConfirmAction, OnAuto, follow: false));
+        follower.Adjust(1, Battle, ActionPlaying, Enemy, follow: false); // turbo switched off meanwhile
+
+        Assert.Equal(1, follower.Adjust(1, Battle, ConfirmAction, OnAuto));
     }
 
     [Theory]

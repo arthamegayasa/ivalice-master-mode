@@ -15,7 +15,7 @@ index 7b69a68..a65493b 100644
  
  public class ConfiguratorMixin : ConfiguratorMixinBase
 diff --git a/Mod.cs b/Mod.cs
-index 4cf0b5a..285b5cd 100644
+index 4cf0b5a..98c19b7 100644
 --- a/Mod.cs
 +++ b/Mod.cs
 @@ -127,6 +127,7 @@ public class Mod : ModBase
@@ -26,7 +26,7 @@ index 4cf0b5a..285b5cd 100644
              _logger.WriteLine($"[{_modConfig.ModId}] Found EarnJp function at 0x{earnJpAddress:X}.");
              
              if (_hooks != null)
-@@ -357,6 +358,38 @@ public class Mod : ModBase
+@@ -357,6 +358,40 @@ public class Mod : ModBase
          return false;
      }
  
@@ -47,7 +47,7 @@ index 4cf0b5a..285b5cd 100644
 +        var lea = (byte*) functionAddress + leaOffset;
 +        if (lea[0] != 0x48 || lea[1] != 0x8D || lea[2] != 0x05)
 +        {
-+            _logger.WriteLine($"[{_modConfig.ModId}] Unit table not found; the multiplier will apply to every unit.", Color.OrangeRed);
++            _logger.WriteLine($"[{_modConfig.ModId}] Unit table not found; with 'Player units only' on, the multiplier will apply to no one.", Color.OrangeRed);
 +            return;
 +        }
 +        _unitTableAddress = (nuint) (lea + 7 + *(int*) (lea + 3));
@@ -57,7 +57,9 @@ index 4cf0b5a..285b5cd 100644
 +    /// <summary>Whether the multiplier applies to the unit in this battle slot.</summary>
 +    private unsafe bool AppliesTo(int id)
 +    {
-+        if (!_configuration.PlayerUnitsOnly || _unitTableAddress == 0 || id < 0 || id >= UnitCount) return true;
++        if (!_configuration.PlayerUnitsOnly) return true;
++        // Without a way to tell the sides apart, multiply for no one rather than for the enemy too.
++        if (_unitTableAddress == 0 || id < 0 || id >= UnitCount) return false;
 +        var flags = *((byte*) _unitTableAddress + id * UnitSize + UnitFlagsOffset);
 +        return (flags & UnitTeamMask) == 0;
 +    }
@@ -65,7 +67,7 @@ index 4cf0b5a..285b5cd 100644
      private int EarnJpImpl(int id, int jpAmount, byte arg3, int arg4)
      {
          var result = 0;
-@@ -364,7 +397,7 @@ public class Mod : ModBase
+@@ -364,7 +399,7 @@ public class Mod : ModBase
          if (_earnJpHook != null && _earnJpHook.IsHookActivated)
          {
              var originalJp = jpAmount;
@@ -74,7 +76,7 @@ index 4cf0b5a..285b5cd 100644
              result = _earnJpHook.OriginalFunction(id, newJp, arg3, arg4);
          }
          return result;
-@@ -378,7 +411,7 @@ public class Mod : ModBase
+@@ -378,7 +413,7 @@ public class Mod : ModBase
          {
              result = _displayJpHook.OriginalFunction(id, results);
              var originalJp = results->jp;

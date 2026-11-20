@@ -32,8 +32,9 @@ public sealed class TurboFollower
     /// <param name="context">The game's speed context: 0 menus, 1 battle, 2 event scene, 3 world map.</param>
     /// <param name="battleState">The battle state machine's current state.</param>
     /// <param name="acting">The unit whose turn it is, or null when there is none.</param>
+    /// <param name="follow">When false nothing is changed, but turbo is still tracked so no stale speed is kept.</param>
     /// <returns>Ticks per frame to run instead.</returns>
-    public int Adjust(int iterations, int context, int battleState, ActingUnit? acting)
+    public int Adjust(int iterations, int context, int battleState, ActingUnit? acting, bool follow = true)
     {
         if (context is not (MenuContext or BattleContext))
         {
@@ -42,14 +43,17 @@ public sealed class TurboFollower
         }
         if (acting is not { } unit) return iterations;
 
-        var heldByTurboMod = context == MenuContext || (unit.PlayerOwned && HeldForPlayers.Contains(battleState));
-        if (!heldByTurboMod)
+        var heldState = HeldForPlayers.Contains(battleState);
+        if (context == BattleContext && !(unit.PlayerOwned && heldState))
         {
             // The turbo mod applies its speed here, so this is the truth about whether turbo is on.
             if (iterations >= 1) _turboSpeed = iterations;
             return iterations;
         }
 
-        return unit is { PlayerOwned: true, AiDriven: true } && iterations == 1 ? _turboSpeed : iterations;
+        // Only the battle states the turbo mod holds back are sped up. Anything else that runs at one
+        // tick per frame (a pause menu, a dialog) is left at the speed the player expects.
+        var onAuto = unit is { PlayerOwned: true, AiDriven: true };
+        return follow && onAuto && heldState && iterations == 1 ? _turboSpeed : iterations;
     }
 }

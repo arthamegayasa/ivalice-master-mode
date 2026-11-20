@@ -163,6 +163,8 @@ try {
             @{ Repo = 'knightsong/xp-multiplier'; Id = 'fftivc.mechanics.xpmultiplier'; Commit = 'fede4e0e7e2c0404a17e8e79fb0a0cd4fdad0ce5'; Patch = 'xp-multiplier-player-units-only.patch' })) {
         $marker = Join-Path $modsDir "$($item.Id)\ivalice-patch.txt"
         if ((Test-Path $marker) -and -not $Force) { Write-Host "   $($item.Id): already installed"; continue }
+        # An unpatched copy from an earlier version is rebuilt, but the player's on/off choice for it is kept.
+        $firstInstall = -not (Test-Path (Join-Path $modsDir $item.Id))
         $source = Join-Path $work ($item.Repo -replace '/', '_')
         git clone --quiet "https://github.com/$($item.Repo)" $source
         if ($LASTEXITCODE -ne 0) { throw "Could not clone $($item.Repo)." }
@@ -176,7 +178,7 @@ try {
             throw "Build of $($item.Repo) succeeded but did not produce $($item.Id) in $modsDir."
         }
         Set-Content -Path $marker -Value $item.Patch -Encoding ascii
-        $newlyInstalled.Add($item.Id)
+        if ($firstInstall) { $newlyInstalled.Add($item.Id) }
         Write-Host "   $($item.Id): patched, built and installed"
     }
 

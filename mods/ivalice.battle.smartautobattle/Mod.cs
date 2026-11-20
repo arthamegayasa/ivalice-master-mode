@@ -82,6 +82,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private volatile bool _active;
     private bool _xinputAvailable = true;
     private bool _reportedFailure;
+    /// <summary>Set when the mod decided it is not safe to hook this game build.</summary>
+    private bool _unsafeToHook;
 
     // Touched only on the game's thread, inside the hook.
     private bool _wasActive;
@@ -131,6 +133,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             if (!RegisterSelfTest.RegistersSurvive(address))
             {
                 _refreshControlHook.Disable();
+                _unsafeToHook = true;
                 _logger.WriteLine($"{Tag} Self-test FAILED: the hook does not preserve the registers the game relies on. The hook was removed and the mod is inactive.");
                 return;
             }
@@ -156,6 +159,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         // Registered last, so the scans it depends on have already reported.
         scanner.AddMainModuleScan(TickCountPattern, result =>
         {
+            if (_unsafeToHook) return;
             if (!result.Found || _unitTable == null || _getActiveActor == null || _battleStateGlobal == null)
             {
                 _logger.WriteLine($"{Tag} Turbo follow is unavailable on this game version; auto-battle itself is not affected.");
@@ -204,6 +208,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         try
         {
             var follow = _configuration.FollowTurbo;
+            var logging = _configuration.DebugLog;
 
             var speedManager = *_speedManagerGlobal;
             if (speedManager == null) return iterations;
@@ -220,10 +225,10 @@ public unsafe class Mod : ModBase // <= Do not Remove.
                         AiDriven: (actor[SceneControlFlags] & BattleLayout.ControlBit) == 0);
             }
 
-            var adjusted = follow
-                ? _turboFollower.Adjust(iterations, *(int*)(speedManager + SpeedContextOffset), *_battleStateGlobal, acting)
-                : iterations;
-            if (_configuration.DebugLog) LogHoldDuration(acting, *_battleStateGlobal, iterations, adjusted);
+            var adjusted = _turboFollower.Adjust(
+                iterations, *(int*)(speedManager + SpeedContextOffset), *_battleStateGlobal, acting, follow);
+            if (logging) LogHoldDuration(acting, *_battleStateGlobal, iterations, adjusted);
+            else _holdStartedAt = 0;
             return adjusted;
         }
         catch (Exception e)
