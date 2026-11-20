@@ -81,13 +81,14 @@ public class RosterRecordTests
     }
 
     [Fact]
-    public void Memory_the_game_has_not_set_up_yet_lists_at_most_a_blank_first_slot()
+    public void Memory_the_game_has_not_set_up_yet_lists_nobody()
     {
-        // Before the game clears the roster at start-up every byte is zero.
-        var units = RosterExport.DescribeAll(new byte[RosterLayout.TableSize], Fake.QuietBattleTable(), Fake.JobTable(), Fake.WorldMap);
+        // Before the game clears the roster at start-up every byte is zero, which looks like slot 0.
+        var blank = new byte[RosterLayout.TableSize];
 
-        Assert.Equal([0], units.Select(u => u.Slot));
-        Assert.Equal(("unknown", "unknownKind", false), (units[0].Kind, units[0].Reason, units[0].Eligible));
+        Assert.Empty(RosterExport.DescribeAll(blank, Fake.QuietBattleTable(), Fake.JobTable(), Fake.WorldMap));
+        Assert.False(RosterRecord.Holds(RosterLayout.Record(blank, 0), 0));
+        Assert.Equal(Refusal.EmptySlot, Reincarnation.Check(RosterLayout.Record(blank, 0), 0));
     }
 
     [Fact]

@@ -87,11 +87,13 @@ public readonly record struct StatBlock(int Hp, int Mp, int Speed, int PhysicalA
 public static class RosterRecord
 {
     /// <summary>
-    /// Whether this record holds the unit of the given slot. A record in use carries its own slot number;
-    /// a free one carries 0xFF, and memory the game has not set up yet carries neither.
+    /// Whether this record holds the unit of the given slot. A record in use carries its own slot number
+    /// and a character marker; a free one carries 0xFF as slot number, and memory the game has not set
+    /// up yet is all zero.
     /// </summary>
     public static bool Holds(ReadOnlySpan<byte> record, int slot) =>
-        record[RosterLayout.SlotId] != RosterLayout.EmptySlot && record[RosterLayout.SlotId] == slot;
+        record[RosterLayout.SlotId] != RosterLayout.EmptySlot && record[RosterLayout.SlotId] == slot
+        && record[RosterLayout.Marker] != 0;
 
     public static UnitKind Kind(ReadOnlySpan<byte> record)
     {
