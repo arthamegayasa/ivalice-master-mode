@@ -16,8 +16,9 @@ One place to install, watch and tune mods for **FINAL FANTASY TACTICS - The Ival
 - Warns about conflicts, such as two mods that hook the same game function.
 - Launches the game with the enabled mods.
 - Shows the latest session log and picks out the lines worth checking.
+- Lists the party of the running game and reincarnates characters (see Reincarnation below).
 
-The app changes the same files Reloaded-II reads, so Reloaded-II's own launcher keeps working alongside it. Changes apply the next time the game starts.
+The app changes the same files Reloaded-II reads, so Reloaded-II's own launcher keeps working alongside it. Changes to mods and settings apply the next time the game starts.
 
 ## Smart Auto Battle
 
@@ -32,6 +33,18 @@ With Improved Fast Forward on, units on auto-battle keep the turbo speed. Withou
 
 **Status: tested in random battles on one save.** Units acted on their own from the first turn, a healer switched to saving a wounded ally, and F8 handed control back. Story battles with guests and special win conditions have not been tried, so save before using it there. The game still stops for its own pop-ups (for example when a unit finds an item) until you confirm them. [How it works](docs/smart-auto-battle.md) lists the evidence, the known limits and what is still unconfirmed.
 
+## Reincarnation
+
+This project's second mod, run from the **Reinkarnasi** tab of the Control Center while the game is open. A party member of level 10 or higher can start again at level 1 with better starting stats:
+
+- each level given up adds 0.5% **Power** (level 10 gives +5%, level 99 gives +49.5%), and Power adds up over reincarnations to at most +100%;
+- the character restarts from the average starting stats of a new recruit, raised by its Power, so every level gained afterwards builds on a higher base;
+- job, JP, abilities, equipment, Brave and Faith stay as they are.
+
+The tab lists the party with each character's stats, reincarnation count and Power, and what the next reincarnation would give. Pressing **Reinkarnasi** asks for confirmation, copies the save files to a backup folder, and sends the command to the game, which refuses it during a battle or story scene. The change becomes permanent when the game saves.
+
+**Status: run in the game on one save.** A character was reincarnated from the Control Center on the world map; the game showed it at level 1 at once and the next autosave held the change. A battle fought by a reincarnated character has not been played through. [How it works](docs/reincarnation.md) has the evidence and the open points.
+
 ## Mods in the catalog
 
 | Mod | Author | What it does | Licence |
@@ -42,10 +55,11 @@ With Improved Fast Forward on, units on auto-battle keep the turbo speed. Withou
 | [Global JP Boost](https://github.com/knightsong/global-jp-boost) | knightsong | JP multiplier for every unit | GPL-3.0 |
 | [XP Multiplier](https://github.com/knightsong/xp-multiplier) | knightsong | XP multiplier and level cap | GPL-3.0 |
 | Smart Auto Battle | this project | Units fight on their own, healers heal | MIT |
+| Reincarnation | this project | Level 10+ characters restart at level 1 with better starting stats | MIT |
 
 Two Reloaded-II libraries (Signature Scanner and Shared Hooks) are installed as dependencies. Any other mod you drop into the Reloaded-II `Mods` folder also shows up in the app, with an on/off switch.
 
-**Apart from Smart Auto Battle, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source with a small patch from [`patches/`](patches) (so their multipliers apply to your side only, not to enemies), and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
+**Apart from Smart Auto Battle and Reincarnation, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source with a small patch from [`patches/`](patches) (so their multipliers apply to your side only, not to enemies), and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
 
 ## Install
 
@@ -66,7 +80,7 @@ A prebuilt copy of the app is attached to each [release](https://github.com/arth
 
 The script is safe to run again; it skips what is already installed. Useful parameters: `-ReloadedDir` (where Reloaded-II goes; defaults to an existing Reloaded-II, otherwise `%LOCALAPPDATA%\Programs\Reloaded-II`), `-GameDir` (if the game is not found through Steam), `-Force` (reinstall mods), `-NoShortcut`.
 
-To remove everything, delete the Reloaded-II folder, `%APPDATA%\Reloaded-Mod-Loader-II`, and the desktop shortcut. Nothing in the game folder is replaced; Reloaded-II adds one small file there, `steam_appid.txt`, so the game can start outside the Steam client.
+To remove everything, delete the Reloaded-II folder, `%APPDATA%\Reloaded-Mod-Loader-II`, `%LOCALAPPDATA%\IvaliceControlCenter` (the app's data, including save backups and the reincarnation journal), and the desktop shortcut. Nothing in the game folder is replaced; Reloaded-II adds one small file there, `steam_appid.txt`, so the game can start outside the Steam client.
 
 See [CHANGELOG.md](CHANGELOG.md) for what has shipped.
 
@@ -79,13 +93,16 @@ Edit [`catalog/mods.json`](catalog/mods.json). Each entry gives the Reloaded-II 
 ```powershell
 dotnet test tests/Ivalice.Core.Tests
 dotnet test tests/Ivalice.Battle.Tests
+dotnet test tests/Ivalice.Party.Tests
 dotnet build src/Ivalice.ControlCenter -c Release
 ```
 
 - `src/Ivalice.Core`: reads and changes a Reloaded-II profile (enabled mods, settings, diagnostics, log summary). Covered by tests.
 - `src/Ivalice.Battle`: the auto-battle decision logic, as a pure function over a copy of the game's unit table. Covered by tests.
 - `mods/ivalice.battle.smartautobattle`: the Reloaded-II mod that hooks the game and applies those decisions. Set `RELOADEDIIMODS` to your Reloaded-II `Mods` folder before building it.
-- `src/Ivalice.ControlCenter`: a WPF window hosting the HTML interface in `ui/` through WebView2, plus launching the game. Checked by hand, not by tests.
+- `src/Ivalice.Party`: the reincarnation rules, as pure functions over a copy of the game's party roster, plus the file formats the mod and the app exchange. Covered by tests.
+- `mods/ivalice.party.reincarnation`: the Reloaded-II mod that finds the roster, hooks the game's per-frame routine and answers the app's commands. Its hook stub, register probe and file handling are tested in `tests/Ivalice.Party.Tests`. Build it with `RELOADEDIIMODS` set, as above; point it at a scratch folder to build without installing.
+- `src/Ivalice.ControlCenter`: a WPF window hosting the HTML interface in `ui/` through WebView2, plus launching the game, backing up saves and sending reincarnation commands. Checked by hand, not by tests.
 - `catalog/mods.json`: the curated mod descriptions.
 
 ## Credits and licence

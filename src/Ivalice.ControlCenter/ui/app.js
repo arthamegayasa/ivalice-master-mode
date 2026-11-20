@@ -42,13 +42,13 @@ function el(tag, props = {}, ...children) {
 }
 
 let toastTimer = 0;
-function toast(message, good = false) {
+function toast(message, good = false, milliseconds = good ? 2600 : 6500) {
   const box = $("toast");
   box.textContent = message;
   box.classList.toggle("good", good);
   box.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { box.hidden = true; }, good ? 2600 : 6500);
+  toastTimer = setTimeout(() => { box.hidden = true; }, milliseconds);
 }
 
 // ---- State ----------------------------------------------------------------------
@@ -122,10 +122,13 @@ function renderHeader() {
     : errors > 0 ? "Perbaiki masalah di bawah dulu" : "Jalankan game dengan mod aktif";
 
   const footer = document.querySelector("footer");
-  footer.classList.toggle("live", snapshot.gameRunning);
-  $("footer-note").textContent = snapshot.gameRunning
-    ? "Game sedang berjalan. Perubahan berlaku setelah game ditutup dan dijalankan lagi."
-    : "Perubahan berlaku saat game dijalankan berikutnya.";
+  const onReincarnation = currentTab === "reinc";
+  footer.classList.toggle("live", snapshot.gameRunning && !onReincarnation);
+  $("footer-note").textContent = onReincarnation
+    ? "Reinkarnasi berlaku langsung di game yang sedang berjalan. Simpan game agar permanen."
+    : snapshot.gameRunning
+      ? "Game sedang berjalan. Perubahan berlaku setelah game ditutup dan dijalankan lagi."
+      : "Perubahan berlaku saat game dijalankan berikutnya.";
 }
 
 function renderNotices() {
@@ -293,19 +296,263 @@ async function loadLog() {
   }
 }
 
+// ---- Reincarnation view ---------------------------------------------------------
+// Every number shown here comes from the mod and the desktop host (Ivalice.Party); this page only lays it out.
+let reinc = null;       // last answer of getRoster
+let reincShown = "";    // what is on screen, to skip rebuilding the cards when nothing changed
+let reincBusy = null;   // { commandId, title, startedAt } while a command waits for the game
+let reincChoice = null; // the unit the confirmation dialog is about
+
+const REINC_STATUS = {
+  modNotInstalled: ["warning", "Mod Reinkarnasi belum terpasang. Jalankan scripts/install.ps1 dari repositori."],
+  modDisabled: ["warning", "Mod Reinkarnasi sedang nonaktif. Aktifkan di tab Mod, lalu jalankan game."],
+  gameNotRunning: ["info", "Game tidak sedang berjalan. Jalankan game dengan tombol Main dan muat save Anda; daftar karakter akan muncul di sini."],
+  noData: ["info", "Menunggu data dari game. Jika game baru saja dijalankan, tunggu beberapa detik. Jika game sudah berjalan sebelum mod diaktifkan, tutup game lalu jalankan lagi."],
+  unreadable: ["error", "Data dari game tidak bisa dibaca. Versi mod dan aplikasi mungkin berbeda; jalankan scripts/install.ps1 lagi."],
+};
+
+const REINC_REASON = {
+  emptySlot: () => "Slot ini kosong.",
+  badSlot: () => "Slot ini tidak ada.",
+  guest: () => "Tamu tidak bisa bereinkarnasi.",
+  monster: () => "Monster tidak bisa bereinkarnasi.",
+  unknownKind: () => "Jenis unit ini tidak dikenali, jadi stat awalnya tidak diketahui.",
+  onErrand: () => "Sedang pergi menjalankan errand.",
+  levelTooLow: (unit) => `Butuh level ${reinc.rules.minimumLevel}` + (unit ? ` (sekarang level ${unit.level}).` : "."),
+  spareBytesInUse: () => "Tempat penyimpanan catatan reinkarnasi unit ini berisi data lain; mod tidak akan menimpanya.",
+  inBattle: () => "Sedang dalam pertarungan atau adegan cerita. Lakukan di peta dunia.",
+  boundToBattleUnit: () => "Game masih memegang salinan pertarungan unit ini yang bisa menimpa perubahan.",
+  gameStateUnknown: () => "Keadaan game tidak bisa dibaca, jadi mod tidak mau mengambil risiko.",
+  fingerprintMismatch: () => "Slot ini sekarang berisi unit lain. Muat ulang daftar lalu coba lagi.",
+  levelChanged: () => "Level unit berubah sejak Anda mengonfirmasi. Muat ulang daftar lalu coba lagi.",
+  expired: () => "Perintah kedaluwarsa sebelum game sempat menjalankannya.",
+  malformed: () => "Perintah tidak dipahami mod. Versi mod dan aplikasi mungkin berbeda.",
+  unknownAction: () => "Perintah tidak dikenal mod. Versi mod dan aplikasi mungkin berbeda.",
+  journalFailed: () => "Jurnal tidak bisa ditulis, jadi tidak ada yang diubah.",
+};
+
+const reasonText = (code, unit) => (REINC_REASON[code] ? REINC_REASON[code](unit) : `Ditolak game (${code}).`);
+const percent = (permille) => (permille / 10).toLocaleString("id-ID", { maximumFractionDigits: 1 }) + "%";
+const unitTitle = (unit) => unit.name || `${unit.jobName || "Job " + unit.jobId} · slot ${unit.slot}`;
+const statLine = (stats) =>
+  `HP ${stats.hp} · MP ${stats.mp} · Speed ${stats.speed} · PA ${stats.physicalAttack} · MA ${stats.magickAttack}`;
+
+async function loadRoster(force) {
+  try {
+    reinc = await call("getRoster");
+  } catch (error) {
+    toast(error.message);
+    return;
+  }
+  renderReinc(force);
+}
+
+function renderReinc(force) {
+  if (!reinc) return;
+  // The age is left out so a quiet game does not rebuild the cards on every poll.
+  const stale = reinc.status === "stale";
+  const key = JSON.stringify([reinc.status, reinc.commandPending, stale && Math.round(reinc.ageSeconds / 10),
+    reinc.roster && [reinc.roster.safeMode, reinc.roster.game, reinc.roster.units], reincBusy && reincBusy.commandId]);
+  renderWaiting();
+  if (!force && key === reincShown) return;
+  reincShown = key;
+
+  const notices = $("reinc-status");
+  const list = $("reinc-units");
+  const scroll = document.querySelector("main").scrollTop;
+  notices.replaceChildren();
+  list.replaceChildren();
+  const notice = (level, message) => notices.append(el("div", { class: "notice " + level },
+    el("strong", { text: { error: "Masalah", warning: "Perhatian", info: "Info" }[level] }), el("span", { text: message })));
+
+  if (REINC_STATUS[reinc.status]) notice(...REINC_STATUS[reinc.status]);
+  const roster = reinc.roster;
+  $("reinc-foot").hidden = !roster || roster.units.length === 0;
+  if (!roster) return;
+
+  if (stale) {
+    notice("warning", `Game belum memperbarui data selama ${Math.round(reinc.ageSeconds)} detik. Game mungkin sedang dijeda karena jendelanya tidak aktif; perintah baru dijalankan saat game aktif lagi.`);
+  }
+  if (roster.safeMode) notice("info", "Mode aman menyala: mod memeriksa perintah dan menjawab apa yang akan terjadi, tetapi tidak mengubah apa pun di game.");
+  if (roster.game.inBattle) notice("info", "Game sedang dalam pertarungan atau adegan cerita. Reinkarnasi bisa dilakukan setelah kembali ke peta dunia.");
+  if (roster.units.length === 0) {
+    list.append(el("div", { class: "empty" }, el("h2", { text: "Belum ada karakter" }),
+      el("p", { text: "Muat save Anda di game; daftar karakter muncul di sini." })));
+    return;
+  }
+
+  list.append(...roster.units.map(renderUnit));
+  document.querySelector("main").scrollTop = scroll;
+}
+
+function renderUnit(unit) {
+  const stat = (label, value) => el("div", {}, el("dt", { text: label }), el("dd", { text: value === null ? "?" : String(value) }));
+  const shown = unit.shown || { hp: null, mp: null, speed: null, physicalAttack: null, magickAttack: null };
+  const levelOk = unit.level >= reinc.rules.minimumLevel;
+  const next = unit.next;
+
+  return el("article", { class: "card unit" + (unit.eligible ? "" : " off") },
+    el("div", { class: "card-top" },
+      el("div", { class: "card-main" },
+        el("div", { class: "card-title" },
+          el("h3", { text: unitTitle(unit) }),
+          el("span", { class: "meta", text: `${unit.jobName || "Job " + unit.jobId} · Lv ${unit.level}` }),
+          unit.reincarnations > 0 && el("span", { class: "badge lock", text: `Reinkarnasi ×${unit.reincarnations}` }),
+          unit.powerPermille > 0 && el("span", { class: "badge lock", text: `Power +${percent(unit.powerPermille)}` })),
+        el("dl", { class: "unit-stats" },
+          stat("HP", shown.hp), stat("MP", shown.mp), stat("Speed", shown.speed),
+          stat("PA", shown.physicalAttack), stat("MA", shown.magickAttack),
+          stat("Brave", unit.brave), stat("Faith", unit.faith)))),
+    next && levelOk && el("div", { class: "unit-next" },
+      el("span", {}, "Reinkarnasi sekarang: ", el("b", { text: `Power +${percent(next.gainPermille)}` }),
+        ` (total ${percent(next.totalPermille)})`),
+      next.shown && el("span", { class: "muted", text: `Stat level 1 sesudahnya: ${statLine(next.shown)}` })),
+    el("div", { class: "unit-action" },
+      unit.eligible
+        ? el("p", { class: "unit-reason", text: `Level ${unit.level} kembali ke 1.` })
+        : el("p", { class: "unit-reason", text: reasonText(unit.reason, unit) }),
+      unit.eligible && el("button", {
+        class: "confirm", type: "button", text: "Reinkarnasi", disabled: !!reincBusy || reinc.commandPending,
+        "aria-label": "Reinkarnasi " + unitTitle(unit), onclick: () => askReincarnation(unit),
+      })));
+}
+
+function askReincarnation(unit) {
+  reincChoice = unit;
+  const next = unit.next;
+  $("reinc-dialog-title").textContent = `Reinkarnasi ${unitTitle(unit)}?`;
+  $("reinc-dialog-points").replaceChildren(...[
+    `Level ${unit.level} kembali ke 1 dan EXP kembali ke 0.`,
+    `Power bertambah ${percent(next.gainPermille)} menjadi total ${percent(next.totalPermille)}: stat awalnya naik sebesar itu, permanen.`,
+    next.shown && `Stat level 1 sesudahnya: ${statLine(next.shown)} (job sekarang, tanpa perlengkapan).`,
+    "Job, JP, ability, perlengkapan, Brave, dan Faith tidak berubah.",
+    reinc.roster.safeMode
+      ? "Mode aman menyala: game hanya memeriksa dan menjawab, tidak ada yang diubah."
+      : "Sebelum perintah dikirim, semua berkas save dicadangkan ke folder cadangan save.",
+    "Perubahan baru permanen setelah game menyimpan, lewat simpan manual maupun otomatis. Selama belum tersimpan, memuat save lama membatalkannya.",
+  ].filter(Boolean).map((text) => el("li", { text })));
+  $("reinc-dialog").showModal();
+}
+
+async function sendReincarnation(unit) {
+  const title = unitTitle(unit);
+  try {
+    // The dialog told the player whether this is a simulation; the command carries that promise.
+    const sent = await call("reincarnate", {
+      slot: unit.slot, fingerprint: unit.fingerprint, level: unit.level, simulate: reinc.roster.safeMode === true,
+    });
+    reincBusy = { commandId: sent.commandId, title, startedAt: Date.now() };
+    renderReinc(true);
+    pollReincarnation();
+  } catch (error) {
+    toast(error.message);
+    loadRoster(true);
+  }
+}
+
+function renderWaiting() {
+  const box = $("reinc-waiting");
+  box.hidden = !reincBusy;
+  if (!reincBusy) return;
+  const seconds = (Date.now() - reincBusy.startedAt) / 1000;
+  $("reinc-waiting-text").textContent = seconds < 5
+    ? `Menunggu game menjalankan reinkarnasi ${reincBusy.title}…`
+    : `Game belum menjawab (${Math.round(seconds)} detik). Jika jendela game tidak aktif, kembali ke game. Perintah kedaluwarsa setelah ${Math.round(reinc.rules.commandMaxAgeSeconds / 60)} menit.`;
+}
+
+function showReincarnationResult(busy, result) {
+  const power = result.unit ? percent(result.unit.powerPermille) : "";
+  if (result.ok && result.applied) {
+    toast(`${busy.title} bereinkarnasi: sekarang level 1 dengan Power total ${power}. Simpan game agar permanen.`, true, 9000);
+  } else if (result.ok) {
+    toast(`Mode aman: tidak ada yang diubah. Tanpa mode aman, ${busy.title} menjadi level 1 dengan Power total ${power}.`, true, 9000);
+  } else {
+    toast(`Reinkarnasi ${busy.title} ditolak: ${reasonText(result.reason, result.unit)}`, false, 9000);
+  }
+}
+
+async function pollReincarnation() {
+  const busy = reincBusy;
+  if (!busy) return;
+  const finish = (message, good) => {
+    reincBusy = null;
+    if (message) toast(message, good, 9000);
+    loadRoster(true);
+  };
+
+  try {
+    const answer = await call("getReincarnationResult", { commandId: busy.commandId });
+    if (reincBusy !== busy) return;
+    if (answer.done) {
+      reincBusy = null;
+      showReincarnationResult(busy, answer.result);
+      loadRoster(true);
+      return;
+    }
+
+    // The mod refuses a command older than this, so there is nothing left to wait for.
+    if (Date.now() - busy.startedAt > (reinc.rules.commandMaxAgeSeconds + 5) * 1000) {
+      const taken = await call("cancelReincarnation", { commandId: busy.commandId });
+      const late = taken.cancelled ? { done: false } : await call("getReincarnationResult", { commandId: busy.commandId });
+      if (late.done) { reincBusy = null; showReincarnationResult(busy, late.result); loadRoster(true); }
+      else if (taken.cancelled) finish(`Game tidak menjawab; perintah untuk ${busy.title} ditarik kembali. Tidak ada yang diubah.`, false);
+      else finish(`Game sudah mengambil perintah untuk ${busy.title} tetapi jawabannya tidak sampai. Periksa level karakter itu di daftar ini atau di game sebelum mencoba lagi.`, false);
+      return;
+    }
+  } catch (error) {
+    if (reincBusy === busy) finish(error.message, false);
+    return;
+  }
+
+  renderWaiting();
+  setTimeout(pollReincarnation, 400);
+}
+
+async function cancelReincarnation() {
+  const busy = reincBusy;
+  if (!busy) return;
+  try {
+    const answer = await call("cancelReincarnation", { commandId: busy.commandId });
+    if (reincBusy !== busy) return;
+    if (answer.cancelled) {
+      reincBusy = null;
+      toast(`Perintah untuk ${busy.title} dibatalkan. Tidak ada yang diubah.`, true, 5000);
+      loadRoster(true);
+    } else {
+      toast("Game sudah mengambil perintah itu; menunggu jawabannya.");
+    }
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 // ---- Wiring ---------------------------------------------------------------------
+let currentTab = "mods";
 function selectTab(name) {
-  for (const tab of ["mods", "log"]) {
+  currentTab = name;
+  for (const tab of ["mods", "reinc", "log"]) {
     $("tab-" + tab).setAttribute("aria-selected", String(tab === name));
     $("view-" + tab).hidden = tab !== name;
   }
   $("notices").hidden = name !== "mods";
+  renderHeader();
   if (name === "log") loadLog();
+  if (name === "reinc") loadRoster(true);
 }
 
 $("tab-mods").addEventListener("click", () => selectTab("mods"));
+$("tab-reinc").addEventListener("click", () => selectTab("reinc"));
 $("tab-log").addEventListener("click", () => selectTab("log"));
 $("log-refresh").addEventListener("click", loadLog);
+$("reinc-refresh").addEventListener("click", () => loadRoster(true));
+$("reinc-cancel").addEventListener("click", cancelReincarnation);
+$("open-backups").addEventListener("click", () => call("open", { target: "saveBackups" }).catch((e) => toast(e.message)));
+$("reinc-dialog-cancel").addEventListener("click", () => $("reinc-dialog").close());
+$("reinc-dialog-confirm").addEventListener("click", () => {
+  $("reinc-dialog").close();
+  if (reincChoice && !reincBusy) sendReincarnation(reincChoice);
+  reincChoice = null;
+});
 for (const [id, target] of [["open-mods", "mods"], ["open-logs", "logs"], ["open-reloaded", "reloaded"]]) {
   $(id).addEventListener("click", () => call("open", { target }).catch((e) => toast(e.message)));
 }
@@ -336,3 +583,4 @@ async function refresh(full) {
 
 refresh(true);
 setInterval(() => { if (!document.querySelector("input[type=range]:active")) refresh(false); }, 3000);
+setInterval(() => { if (currentTab === "reinc" && !$("reinc-dialog").open) loadRoster(false); }, 2000);
