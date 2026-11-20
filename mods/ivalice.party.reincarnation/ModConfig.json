@@ -1,0 +1,21 @@
+{
+  "ModId": "ivalice.party.reincarnation",
+  "ModName": "Reincarnation",
+  "ModAuthor": "arthamegayasa",
+  "ModVersion": "0.4.0",
+  "ModDescription": "Lets a party member of level 10 or higher start again at level 1 with permanently better starting stats. Chosen in Ivalice Control Center; refused during battles.",
+  "ModDll": "ivalice.party.reincarnation.dll",
+  "ModIcon": "Preview.png",
+  "ModR2RManagedDll32": "",
+  "ModR2RManagedDll64": "",
+  "ModNativeDll32": "",
+  "ModNativeDll64": "",
+  "IsLibrary": false,
+  "ReleaseMetadataFileName": "ivalice.party.reincarnation.ReleaseMetadata.json",
+  "PluginData": {},
+  "IsUniversalMod": false,
+  "ModDependencies": [ "Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks" ],
+  "OptionalDependencies": [],
+  "SupportedAppId": [ "fft_enhanced.exe" ],
+  "ProjectUrl": "https://github.com/arthamegayasa/ivalice-master-mode"
+}
