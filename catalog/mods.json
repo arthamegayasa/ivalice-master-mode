@@ -87,14 +87,15 @@
       "role": "feature",
       "category": "Progres",
       "summary": "Pengali JP untuk semua unit, tanpa perlu memasang ability JP Boost.",
-      "details": "Mengalikan JP dari aksi dan JP limpahan. Nilai 1.5 setara ability JP Boost. Secara bawaan ability JP Boost dihapus dari semua job agar slot support bebas dipakai; unit yang sudah memasangnya tetap memilikinya.",
+      "details": "Mengalikan JP dari aksi dan JP limpahan untuk unit di pihak Anda (tambalan proyek ini atas mod aslinya). Nilai 1.5 setara ability JP Boost. Secara bawaan ability JP Boost dihapus dari semua job agar slot support bebas dipakai; unit yang sudah memasangnya tetap memilikinya.",
       "sourceUrl": "https://github.com/knightsong/global-jp-boost",
       "license": "GPL-3.0",
       "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks", "fftivc.utility.modloader"],
       "sharesHookWith": ["fftivc.mechanics.xpmultiplier"],
       "settings": [
         { "key": "JpMultiplier", "type": "number", "label": "Pengali JP", "help": "1.0 berarti normal. 1.5 setara ability JP Boost.", "min": 0, "max": 10, "step": 0.1, "default": 1.5, "unit": "x" },
-        { "key": "RemoveJpBoost", "type": "bool", "label": "Hapus ability JP Boost", "help": "Jika dimatikan, ability tetap ada dan efeknya bertumpuk dengan pengali.", "default": true }
+        { "key": "RemoveJpBoost", "type": "bool", "label": "Hapus ability JP Boost", "help": "Jika dimatikan, ability tetap ada dan efeknya bertumpuk dengan pengali.", "default": true },
+        { "key": "PlayerUnitsOnly", "type": "bool", "label": "Hanya untuk unit Anda", "help": "Pengali hanya berlaku untuk unit di pihak Anda. Jika dimatikan, musuh ikut mendapat JP yang dikalikan.", "default": true }
       ]
     },
     {
@@ -104,14 +105,15 @@
       "role": "feature",
       "category": "Progres",
       "summary": "Pengali XP dan batas level untuk semua unit.",
-      "details": "Mengalikan XP yang didapat. Nilai 0 menghentikan XP tetapi JP tetap bertambah, berguna untuk melatih job tanpa menaikkan level. Batas level menghentikan XP setelah level tertentu.",
+      "details": "Mengalikan XP yang didapat unit di pihak Anda; musuh mendapat XP normal (tambalan proyek ini atas mod aslinya). Nilai 0 menghentikan XP tetapi JP tetap bertambah, berguna untuk melatih job tanpa menaikkan level. Batas level menghentikan XP setelah level tertentu.",
       "sourceUrl": "https://github.com/knightsong/xp-multiplier",
       "license": "GPL-3.0",
       "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks", "fftivc.utility.modloader"],
       "sharesHookWith": ["fftivc.mechanics.globaljpboost"],
       "settings": [
         { "key": "XpMultiplier", "type": "number", "label": "Pengali XP", "help": "1.0 berarti normal. 0 menghentikan XP.", "min": 0, "max": 100, "step": 0.5, "default": 1.0, "unit": "x" },
-        { "key": "LevelCap", "type": "integer", "label": "Batas level", "help": "Unit berhenti menerima XP setelah mencapai level ini.", "min": 1, "max": 99, "step": 1, "default": 99 }
+        { "key": "LevelCap", "type": "integer", "label": "Batas level", "help": "Unit berhenti menerima XP setelah mencapai level ini.", "min": 1, "max": 99, "step": 1, "default": 99 },
+        { "key": "PlayerUnitsOnly", "type": "bool", "label": "Hanya untuk unit Anda", "help": "Pengali hanya berlaku untuk unit di pihak Anda. Jika dimatikan, musuh ikut mendapat XP yang dikalikan dan naik level sama cepatnya.", "default": true }
       ]
     },
     {
@@ -120,8 +122,8 @@
       "author": "arthamegayasa",
       "role": "feature",
       "category": "Pertarungan",
-      "summary": "Eksperimental, belum diuji dalam pertarungan. Unit Anda bertarung sendiri: penyembuh menolong teman yang sekarat, yang lain menyerang. F8 untuk mematikan.",
-      "details": "Belum diuji dalam pertarungan: simpan game dulu dan coba di pertarungan acak sebelum pertarungan cerita. Mod ini memakai auto battle bawaan game, tanpa perlu membuka menu tiap unit. Unit dengan skillset penyembuh beralih ke mode Save Fading Life saat ada teman yang tumbang atau HP-nya di bawah ambang; selain itu semua unit memakai mode Fight for Life. Untuk mengambil alih kendali, tekan F8 atau klik kedua stik (L3 + R3): nada rendah berarti mati, nada tinggi berarti nyala, dan keadaan itu bertahan sampai Anda menekannya lagi atau menutup game. Selama mod menyala, memilih Manual di menu Auto-battle tidak bertahan; mode Protect Allies dan Run Like a Rabbit yang Anda pilih sendiri tidak diubah. Unit tamu dan musuh tidak disentuh.",
+      "summary": "Unit Anda bertarung sendiri sejak awal pertarungan: penyembuh menolong teman yang sekarat, yang lain menyerang. F8 untuk mengambil alih.",
+      "details": "Sudah diuji di pertarungan acak; pertarungan cerita dengan tamu belum, jadi simpan game dulu sebelum memakainya di sana. AI yang dipakai adalah AI bawaan game, jadi tim yang levelnya di bawah musuh tetap bisa kalah. Game tetap berhenti di jendela pesannya sendiri (misalnya saat unit menemukan item) sampai Anda menekan konfirmasi. Mod ini memakai auto battle bawaan game, tanpa perlu membuka menu tiap unit. Unit dengan skillset penyembuh beralih ke mode Save Fading Life saat ada teman yang tumbang atau HP-nya di bawah ambang; selain itu semua unit memakai mode Fight for Life. Untuk mengambil alih kendali, tekan F8 atau klik kedua stik (L3 + R3): nada rendah berarti mati, nada tinggi berarti nyala, dan keadaan itu bertahan sampai Anda menekannya lagi atau menutup game. Selama mod menyala, memilih Manual di menu Auto-battle tidak bertahan; mode Protect Allies dan Run Like a Rabbit yang Anda pilih sendiri tidak diubah. Unit tamu dan musuh tidak disentuh.",
       "sourceUrl": "https://github.com/arthamegayasa/ivalice-master-mode",
       "license": "MIT",
       "requires": ["Reloaded.Memory.SigScan.ReloadedII", "reloaded.sharedlib.hooks"],

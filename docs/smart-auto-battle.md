@@ -4,7 +4,7 @@ Smart Auto Battle does not contain its own battle AI. It switches the player's u
 
 Everything below was read from `FFT_enhanced.exe` version 1.00 (SHA-256 `937233F7FE76182A665C487C8802F5CEC6662DDD09967E87CD09FB146FC6B5D5`) by static disassembly. Addresses are relative to the image base (RVAs).
 
-**Nothing here has been tested inside a battle yet.** Save before trying it, try a random battle before a story battle, and press F8 or L3 + R3 to switch it off if a fight goes wrong.
+The mod has been run in random battles on one save (see "Confirmed in play"). Story battles with guests have not been tried; save before using it there, and press F8 or L3 + R3 to switch it off if a fight goes wrong.
 
 ## What the mod does
 
@@ -60,13 +60,16 @@ Mode `0x10` first searches for an ally who is knocked out, critical, or below ha
 - Skillset ids (Items 6, Martial Arts 9, White Magicks 10) come from the mod loader's `JobCommandData.xml`.
 - That the game re-aims a fighting unit by itself. The mod does not depend on it: it re-aims whenever the stored target is no longer a living enemy.
 
-## To confirm in play
+## Confirmed in play
 
-- units act on their own from the first turn, with no menu;
-- a healer heals or revives when an ally drops below the threshold;
-- toggling off returns control on each unit's next turn;
-- story battles with guests and special win conditions still behave;
-- a suspend save made during an auto battle loads correctly.
+Observed on 2026-11-20 in a random battle (Mandalia Plain), from the mod's diagnostic log and screenshots:
+
+- A battle restarted from its beginning ran with every party member marked "Auto" from the first turn, with no menu and no crash.
+- A Chemist switched to Save Fading Life aimed at a wounded ally, and later healed itself while on Fight for Life (HP 1 to 23).
+- Pressing F8 logged the release, the "Auto" markers disappeared, and the next party member got the normal command menu.
+- The game ran more than seven minutes of continuous auto battle.
+
+Still not tried: story battles with guests and special win conditions, and loading a suspend save made during an auto battle. The game's own pop-ups (item found, tutorials) still wait for a confirm press.
 
 ## Prior work
 

@@ -56,6 +56,10 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private bool _wasActive;
     /// <summary>Slots whose auto-battle mode this mod wrote, so it can be taken back when switched off.</summary>
     private readonly bool[] _ordered = new bool[BattleLayout.Capacity];
+    /// <summary>Last HP seen per slot, for the diagnostic log only; -1 when the slot was empty.</summary>
+    private readonly int[] _lastHp = Enumerable.Repeat(-1, BattleLayout.Capacity).ToArray();
+    /// <summary>Last level * 100 + experience seen per slot, for the diagnostic log only.</summary>
+    private readonly int[] _lastXp = Enumerable.Repeat(-1, BattleLayout.Capacity).ToArray();
 
     public Mod(ModContext context)
     {
@@ -159,6 +163,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         if (unit == null || offset < 0 || offset >= BattleLayout.TableSize || offset % BattleLayout.Stride != 0) return;
         var slot = (int)(offset / BattleLayout.Stride);
 
+        if (_configuration.DebugLog) LogHpChanges();
+
         var order = AutoBattlePlanner.Plan(new ReadOnlySpan<byte>(_unitTable, BattleLayout.TableSize), slot, _settings);
         if (order is not { } o) return;
 
@@ -168,6 +174,28 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         unit[BattleLayout.AutoTarget] = o.Target;
         unit[BattleLayout.AutoMode] = o.Mode;
         _ordered[slot] = true;
+    }
+
+    /// <summary>Diagnostics: writes a line whenever a unit's HP differs from the last time it was looked at.</summary>
+    private void LogHpChanges()
+    {
+        for (var slot = 0; slot < BattleLayout.Capacity; slot++)
+        {
+            var unit = _unitTable + slot * BattleLayout.Stride;
+            if (unit[BattleLayout.InUse] == BattleLayout.EmptySlot) { _lastHp[slot] = _lastXp[slot] = -1; continue; }
+
+            var side = (unit[BattleLayout.PermanentFlags] & BattleLayout.TeamMask) == 0 ? "ally" : "enemy";
+            int hp = *(ushort*)(unit + BattleLayout.Hp), max = *(ushort*)(unit + BattleLayout.MaxHp);
+            if (_lastHp[slot] >= 0 && _lastHp[slot] != hp)
+                _logger.WriteLine($"{Tag} HP {side} {slot}: {_lastHp[slot]} -> {hp}/{max}.");
+            _lastHp[slot] = hp;
+
+            // Experience runs 0-99 within a level, so level * 100 + experience grows by exactly what was earned.
+            var xp = unit[BattleLayout.Level] * 100 + unit[BattleLayout.Experience];
+            if (_lastXp[slot] >= 0 && xp > _lastXp[slot])
+                _logger.WriteLine($"{Tag} XP {side} {slot}: +{xp - _lastXp[slot]} (level {unit[BattleLayout.Level]}, exp {unit[BattleLayout.Experience]}).");
+            _lastXp[slot] = xp;
+        }
     }
 
     /// <summary>Returns to manual every unit this mod ordered, leaving modes the player picked in the menu.</summary>

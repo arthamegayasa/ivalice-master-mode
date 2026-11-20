@@ -25,6 +25,8 @@ public static class BattleLayout
 
     public const int PrimarySkillset = 0x12;
     public const int SecondarySkillset = 0x13;
+    public const int Experience = 0x28;
+    public const int Level = 0x29;
     public const int Hp = 0x30;
     public const int MaxHp = 0x32;
 

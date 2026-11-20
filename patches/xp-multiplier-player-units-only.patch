@@ -1,0 +1,77 @@
+diff --git a/Config.cs b/Config.cs
+index fb1914c..0e689ed 100644
+--- a/Config.cs
++++ b/Config.cs
+@@ -36,6 +36,11 @@ public class Config : Configurable<Config>
+         isTextFieldEditable: true,
+         textValidationRegex: "^\\d{1,2}$")]
+     public int LevelCap { get; set; } = 99;
++
++    [DisplayName("Player units only")]
++    [Description("Apply the multiplier only to units on your side. Turn off to also multiply what enemies earn.")]
++    [DefaultValue(true)]
++    public bool PlayerUnitsOnly { get; set; } = true;
+ }
+ 
+ public class ConfiguratorMixin : ConfiguratorMixinBase
+diff --git a/Mod.cs b/Mod.cs
+index 668c7bf..7c96674 100644
+--- a/Mod.cs
++++ b/Mod.cs
+@@ -122,6 +122,7 @@ public class Mod : ModBase
+             }
+ 
+             var processXpAddress = gameBase + (nuint) result.Offset;
++            LocateUnitTable(processXpAddress, 0x51);
+             
+             if (_hooks != null)
+             {
+@@ -221,6 +222,38 @@ public class Mod : ModBase
+         _xpMultiplier = xpMultiplier;
+     }
+ 
++
++    // Battle unit table: 21 records of 0x200 bytes. Byte 0x1EE holds the unit's own flags;
++    // team bits 0x30 are zero for units on the player's side (party members and guests).
++    private const int UnitCount = 21;
++    private const int UnitSize = 0x200;
++    private const int UnitFlagsOffset = 0x1EE;
++    private const byte UnitTeamMask = 0x30;
++    private nuint _unitTableAddress;
++
++    /// <summary>
++    /// Reads the unit table address from the "lea rax, [rip+disp]" the hooked function itself uses.
++    /// </summary>
++    private unsafe void LocateUnitTable(nuint functionAddress, int leaOffset)
++    {
++        var lea = (byte*) functionAddress + leaOffset;
++        if (lea[0] != 0x48 || lea[1] != 0x8D || lea[2] != 0x05)
++        {
++            _logger.WriteLine($"[{_modConfig.ModId}] Unit table not found; the multiplier will apply to every unit.", Color.OrangeRed);
++            return;
++        }
++        _unitTableAddress = (nuint) (lea + 7 + *(int*) (lea + 3));
++        _logger.WriteLine($"[{_modConfig.ModId}] Found unit table at 0x{_unitTableAddress:X}.");
++    }
++
++    /// <summary>Whether the multiplier applies to the unit in this battle slot.</summary>
++    private unsafe bool AppliesTo(int id)
++    {
++        if (!_configuration.PlayerUnitsOnly || _unitTableAddress == 0 || id < 0 || id >= UnitCount) return true;
++        var flags = *((byte*) _unitTableAddress + id * UnitSize + UnitFlagsOffset);
++        return (flags & UnitTeamMask) == 0;
++    }
++
+     private unsafe int ProcessXpImpl(int id, Results* results)
+     {
+         var result = -1;
+@@ -229,7 +262,8 @@ public class Mod : ModBase
+         {
+             var memory = Memory.Instance;
+             memory.SafeRead(_earnedXpAddress, out byte earnedXp);
+-            byte newXp = (byte) Math.Ceiling(Math.Clamp(_configuration.XpMultiplier * earnedXp, 0, 100));
++            var multiplier = AppliesTo(id) ? _configuration.XpMultiplier : 1.0;
++            byte newXp = (byte) Math.Ceiling(Math.Clamp(multiplier * earnedXp, 0, 100));
+             memory.SafeWrite(_earnedXpAddress, newXp);
+             memory.SafeWrite(_originalXpAddress, earnedXp);
+             result = _processXpHook.OriginalFunction(id, results);

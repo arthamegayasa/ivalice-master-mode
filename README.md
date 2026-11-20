@@ -28,7 +28,7 @@ This project's own mod. When a fight starts, your units act on their own using t
 
 Press **F8** or click both sticks (**L3 + R3**) to switch it off and on during play; a high beep means on, a low beep means off. That is the way to take control back: while the mod is on, choosing Manual in the game's Auto-battle menu does not stick. Protect Allies and Run Like a Rabbit picked in that menu are left alone, and guests and enemies are never touched. The heal threshold and which skillsets count as healers are set in the Control Center.
 
-**Status: not yet tested in a battle.** The mod loads, finds its hook and leaves the game stable at the title screen, and its decision logic is covered by tests, but nobody has played a fight with it. Save first, and try it in a random battle before a story battle. [How it works](docs/smart-auto-battle.md) lists the evidence, the known limits and what is still unconfirmed.
+**Status: tested in random battles on one save.** Units acted on their own from the first turn, a healer switched to saving a wounded ally, and F8 handed control back. Story battles with guests and special win conditions have not been tried, so save before using it there. The game still stops for its own pop-ups (for example when a unit finds an item) until you confirm them. [How it works](docs/smart-auto-battle.md) lists the evidence, the known limits and what is still unconfirmed.
 
 ## Mods in the catalog
 
@@ -43,7 +43,7 @@ Press **F8** or click both sticks (**L3 + R3**) to switch it off and on during p
 
 Two Reloaded-II libraries (Signature Scanner and Shared Hooks) are installed as dependencies. Any other mod you drop into the Reloaded-II `Mods` folder also shows up in the app, with an on/off switch.
 
-**Apart from Smart Auto Battle, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source, and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
+**Apart from Smart Auto Battle, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source with a small patch from [`patches/`](patches) (so their multipliers apply to your side only, not to enemies), and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
 
 ## Install
 

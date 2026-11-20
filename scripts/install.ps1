@@ -154,22 +154,30 @@ try {
         Install-ModFolder $folder $modsDir
     }
 
-    Write-Step 'Mods built from source (GPL-3.0, no published releases)'
+    Write-Step 'Mods built from source with this project''s patch (GPL-3.0, no published releases)'
     $env:RELOADEDIIMODS = $modsDir
+    # Each is pinned to the commit its patch was written against. The patch limits the multiplier to
+    # units on the player's side; a marker file records that the installed build carries it.
     foreach ($item in @(
-            @{ Repo = 'knightsong/global-jp-boost'; Id = 'fftivc.mechanics.globaljpboost' },
-            @{ Repo = 'knightsong/xp-multiplier'; Id = 'fftivc.mechanics.xpmultiplier' })) {
-        if ((Test-Path (Join-Path $modsDir $item.Id)) -and -not $Force) { Write-Host "   $($item.Id): already installed"; continue }
+            @{ Repo = 'knightsong/global-jp-boost'; Id = 'fftivc.mechanics.globaljpboost'; Commit = 'e60aaf18f9875f2df00f430744b0143bf0f30b2a'; Patch = 'global-jp-boost-player-units-only.patch' },
+            @{ Repo = 'knightsong/xp-multiplier'; Id = 'fftivc.mechanics.xpmultiplier'; Commit = 'fede4e0e7e2c0404a17e8e79fb0a0cd4fdad0ce5'; Patch = 'xp-multiplier-player-units-only.patch' })) {
+        $marker = Join-Path $modsDir "$($item.Id)\ivalice-patch.txt"
+        if ((Test-Path $marker) -and -not $Force) { Write-Host "   $($item.Id): already installed"; continue }
         $source = Join-Path $work ($item.Repo -replace '/', '_')
-        git clone --quiet --depth 1 "https://github.com/$($item.Repo)" $source
+        git clone --quiet "https://github.com/$($item.Repo)" $source
         if ($LASTEXITCODE -ne 0) { throw "Could not clone $($item.Repo)." }
+        git -C $source checkout --quiet $item.Commit
+        if ($LASTEXITCODE -ne 0) { throw "Could not check out $($item.Commit) of $($item.Repo)." }
+        git -C $source apply --ignore-whitespace (Join-Path $repo "patches\$($item.Patch)")
+        if ($LASTEXITCODE -ne 0) { throw "Could not apply $($item.Patch) to $($item.Repo)." }
         & $dotnet build $source -c Release --nologo -v q | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "Build of $($item.Repo) failed." }
         if (-not (Test-Path (Join-Path $modsDir "$($item.Id)\ModConfig.json"))) {
             throw "Build of $($item.Repo) succeeded but did not produce $($item.Id) in $modsDir."
         }
+        Set-Content -Path $marker -Value $item.Patch -Encoding ascii
         $newlyInstalled.Add($item.Id)
-        Write-Host "   $($item.Id): built and installed"
+        Write-Host "   $($item.Id): patched, built and installed"
     }
 
     Write-Step 'Smart Auto Battle (this repository)'

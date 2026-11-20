@@ -4,7 +4,9 @@ All notable changes to this project are recorded here. Versions follow [Semantic
 
 ## [0.2.1] - 2026-11-20
 
-Pre-release: Smart Auto Battle is still not confirmed in a full battle.
+### Changed
+
+- **XP Multiplier and Global JP Boost now apply to your side only.** The original mods multiply what every unit earns, so enemies levelled up as fast as the party. The install script now builds both from a pinned commit with a small patch (`patches/`) that checks the unit's team before multiplying, and adds a "Player units only" setting (on by default) to each. Guests on your side still get the multiplier.
 
 ### Fixed
 
@@ -16,12 +18,20 @@ Pre-release: Smart Auto Battle is still not confirmed in a full battle.
 
 ### Verified
 
+- In a battle with XP Multiplier at 5x, an attack by a party member earned +45 experience and an attack by an enemy earned +10.
+- A battle restarted from its beginning ran on auto without the crash for more than seven minutes; a healer switched to saving a wounded ally; F8 returned control and the command menu.
 - The self-test reported `CLOBBERED` with the 0.2.0 hook and passes with the new one, on the same game build.
 - The crash dump showed `r8 = rcx = 0x200` at the faulting instruction, with the return address inside the caller that reloads `rcx` from `r8`.
 
 ### Not verified
 
-- A full battle with the mod on has still not been played through.
+- JP gains with the patched Global JP Boost were not measured.
+- Story battles with guests and special win conditions.
+
+### Known limits
+
+- The game's own pop-ups during a battle (item found, tutorials) still wait for a confirm press.
+- The auto-battle AI is the game's own; a party below the enemies' level can still lose.
 
 ## [0.2.0] - 2026-11-20
 
