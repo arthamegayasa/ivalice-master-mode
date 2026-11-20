@@ -18,7 +18,8 @@ All notable changes to this project are recorded here. Versions follow [Semantic
 
 ### Verified
 
-- 25 new tests cover the rules (job and character rules, stacking, rounding, the enemy filter, tolerant parsing, the write and read round trip), unit recognition, the job export, and the hook stub's register preservation and stack alignment. The Party test project now has 214 tests.
+- 31 new tests cover the rules (job and character rules, stacking, rounding, the enemy filter, tolerant parsing, the write and read round trip), unit recognition, the job export, and the hook stub's register preservation and stack alignment. The Party test project now has 220 tests.
+- An independent review (GPT 6.2 Astra) found no fault in the hook stub, the stack alignment or the relocated instructions. Its findings elsewhere are fixed: an unreadable saved rules file is never treated as empty or overwritten, edits made while the app waits for the host are kept, a character stat left at 100% keeps the job's byte, malformed rule lists are refused, table addresses are checked over their whole length, and a half-installed pair of hooks is removed.
 - Both copy-site patterns match exactly once in `FFT_enhanced.exe`.
 
 ### Confirmed in play
@@ -33,6 +34,7 @@ All notable changes to this project are recorded here. Versions follow [Semantic
 - The switch that extends job rules to enemies, in the game (tests only).
 - Story battles, guests, special jobs other than Ramza's, a job change during battle, and loading a save made after tuned level-ups.
 - The game's second, roster-side level-up routine (`0x278B24`) is not covered by the mod; what triggers it was not determined.
+- The game can add its own correction to the HP and Speed bytes after the mod sets them (`0x1EA910`); it was zero on the test save and was not seen non-zero.
 
 ## [0.4.0] - 2026-11-21
 

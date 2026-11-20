@@ -260,7 +260,10 @@ public sealed class Bridge
             : new ModManager(layout, _catalog).GetState().Mods.FirstOrDefault(m => m.Id == StatTuningMod);
         var status = mod is null || !mod.Installed ? "modNotInstalled" : !mod.Enabled ? "modDisabled" : "ok";
 
+        // Three different things: no file yet, a file that could not be opened just now, a file that is not rules.
+        var rulesExist = File.Exists(_statPaths.RulesFile);
         var rulesText = ReadTextOrNull(_statPaths.RulesFile);
+        var rulesBusy = rulesExist && rulesText is null;
         var rules = StatTuningRules.Parse(rulesText);
         var processIds = GameProcessIds();
 
@@ -280,6 +283,7 @@ public sealed class Bridge
             jobs = ReadJobs(),
             rules = JsonNode.Parse((rules ?? StatTuningRules.Empty).Serialize()),
             rulesUnreadable = rulesText is not null && rules is null,
+            rulesBusy,
             party,
             limits = new
             {
@@ -304,8 +308,10 @@ public sealed class Bridge
                 var id = entry.GetProperty("job").GetInt32();
                 var growth = entry.GetProperty("growth").EnumerateArray().Select(v => v.GetInt32()).ToArray();
                 var multiplier = entry.GetProperty("multiplier").EnumerateArray().Select(v => v.GetInt32()).ToArray();
-                // Rows without a name or without values are unused by the game.
-                if (JobNames.Find(id) is not { } name || multiplier.All(v => v == 0)) continue;
+                // Rows without values are unused by the game. Two rows it does use have no name in the list:
+                // job 0xA1 and the row it switches to (0xA4) once its job level reaches 8.
+                var name = JobNames.Find(id) ?? (id is 0xA1 or 0xA4 ? "Job tanpa nama" : null);
+                if (name is null || multiplier.All(v => v == 0)) continue;
                 var group = id < 0x4A ? "special" : id <= 0x5D ? "generic" : "monster";
                 jobs.Add(new { job = id, name, group, growth, multiplier });
             }
@@ -321,6 +327,10 @@ public sealed class Bridge
     {
         var parsed = StatTuningRules.Parse(rules?.ToJsonString())
             ?? throw new ModOperationException("Aturan tidak bisa dibaca, jadi tidak disimpan.");
+        // The page may have been filled from "no rules" while the saved file could not be opened; do not replace
+        // a file that still cannot be read.
+        if (File.Exists(_statPaths.RulesFile) && ReadTextOrNull(_statPaths.RulesFile) is null)
+            throw new ModOperationException("Berkas aturan sedang dipakai program lain, jadi tidak ditimpa. Coba simpan lagi sebentar lagi.");
         try
         {
             Directory.CreateDirectory(_statPaths.Root);

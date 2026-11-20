@@ -84,6 +84,45 @@ public class StatTuningTests
     }
 
     [Fact]
+    public void A_stat_left_at_100_percent_keeps_the_jobs_byte_even_when_that_is_zero()
+    {
+        // Some jobs have a multiplier of 0 for a stat they do not use.
+        byte[] pairs = [11, 100, 0, 0, 100, 100, 60, 90, 0, 0];
+        var before = pairs.ToArray();
+        var rules = Rules($$"""{ "characters": [ { "fingerprint": "{{Someone}}", "growthPercent": [200, 100, 100, 100, 100] } ] }""");
+
+        rules.Apply(pairs, Squire, playerOwned: true, fingerprint: Someone);
+
+        Assert.Equal(6, pairs[0]);
+        Assert.Equal(before[1..], pairs[1..]);
+    }
+
+    [Theory]
+    [InlineData("""{ "schema": 1, "jobs": {} }""")]
+    [InlineData("""{ "characters": "none" }""")]
+    public void A_list_of_the_wrong_shape_is_not_read_as_no_rules(string text) => Assert.Null(StatTuningRules.Parse(text));
+
+    [Fact]
+    public void Empty_lists_are_a_valid_way_to_have_no_rules()
+    {
+        Assert.True(Rules("""{ "schema": 1, "jobs": [], "characters": [] }""").IsEmpty);
+    }
+
+    [Fact]
+    public void One_bad_entry_does_not_cost_the_good_ones()
+    {
+        var rules = Rules("""{ "jobs": [ { "job": 74, "growth": [8] }, { "job": "x", "growth": [1] }, { "job": 7.5, "growth": [1] } ] }""");
+
+        Assert.Equal(74, Assert.Single(rules.Jobs).Key);
+    }
+
+    [Fact]
+    public void Text_that_is_not_valid_unicode_gives_no_rules_instead_of_an_error()
+    {
+        Assert.Null(StatTuningRules.Parse("{ \"jobs\": [ \"" + '\uD800' + "\" ] }"));
+    }
+
+    [Fact]
     public void Fingerprints_match_whatever_their_letter_case()
     {
         var rules = Rules("""{ "characters": [ { "fingerprint": "0a1b2c3d", "multiplierPercent": [200, 100, 100, 100, 100] } ] }""");

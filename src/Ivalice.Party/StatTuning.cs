@@ -78,10 +78,15 @@ public sealed class StatTuningRules
         {
             for (var stat = 0; stat < StatBlock.Count; stat++)
             {
-                // The game treats a growth of 0 as 1.
-                var growth = Math.Max(1, (int)pairs[stat * 2]);
-                changed |= Set(pairs, stat * 2, Scale(growth * 100, character.GrowthPercent[stat]));
-                changed |= Set(pairs, stat * 2 + 1, Scale(pairs[stat * 2 + 1] * character.MultiplierPercent[stat], 100));
+                // A stat left at 100% keeps the very byte the job gave, also where that is 0.
+                if (character.GrowthPercent[stat] != 100)
+                {
+                    // The game treats a growth of 0 as 1.
+                    var growth = Math.Max(1, (int)pairs[stat * 2]);
+                    changed |= Set(pairs, stat * 2, Scale(growth * 100, character.GrowthPercent[stat]));
+                }
+                if (character.MultiplierPercent[stat] != 100)
+                    changed |= Set(pairs, stat * 2 + 1, Scale(pairs[stat * 2 + 1] * character.MultiplierPercent[stat], 100));
             }
         }
 
@@ -112,12 +117,19 @@ public sealed class StatTuningRules
 
             var toEnemies = root.TryGetProperty("applyJobsToEnemies", out var flag) && flag.ValueKind == JsonValueKind.True;
 
+            // A list of the wrong shape is a damaged document, not a request to drop every rule.
+            var hasJobs = root.TryGetProperty("jobs", out var jobList);
+            var hasCharacters = root.TryGetProperty("characters", out var characterList);
+            if (hasJobs && jobList.ValueKind != JsonValueKind.Array) return null;
+            if (hasCharacters && characterList.ValueKind != JsonValueKind.Array) return null;
+
             var jobs = new Dictionary<int, JobTuning>();
-            if (root.TryGetProperty("jobs", out var jobList) && jobList.ValueKind == JsonValueKind.Array)
+            if (hasJobs)
             {
                 foreach (var entry in jobList.EnumerateArray())
                 {
-                    if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("job", out var id) || !id.TryGetInt32(out var row)) continue;
+                    if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("job", out var id)
+                        || id.ValueKind != JsonValueKind.Number || !id.TryGetInt32(out var row)) continue;
                     if (row < 0 || row >= JobTable.Rows) continue;
                     var tuning = new JobTuning(Bytes(entry, "growth"), Bytes(entry, "multiplier"));
                     if (!tuning.IsEmpty) jobs[row] = tuning;
@@ -125,7 +137,7 @@ public sealed class StatTuningRules
             }
 
             var characters = new Dictionary<string, CharacterTuning>(StringComparer.OrdinalIgnoreCase);
-            if (root.TryGetProperty("characters", out var characterList) && characterList.ValueKind == JsonValueKind.Array)
+            if (hasCharacters)
             {
                 foreach (var entry in characterList.EnumerateArray())
                 {
@@ -140,7 +152,7 @@ public sealed class StatTuningRules
 
             return new StatTuningRules(toEnemies, jobs, characters);
         }
-        catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException or OverflowException)
+        catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException or OverflowException or ArgumentException)
         {
             return null;
         }

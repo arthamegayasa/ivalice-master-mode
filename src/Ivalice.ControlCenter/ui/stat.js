@@ -47,6 +47,7 @@ const draftKey = (draft) => JSON.stringify(rulesFrom(draft));
 const statDirty = () => !!statDraft && draftKey(statDraft) !== statSavedKey;
 
 async function loadStat(keepDraft) {
+  const before = statDraft && draftKey(statDraft);
   let fresh;
   try {
     fresh = await call("getStatTuning");
@@ -54,10 +55,14 @@ async function loadStat(keepDraft) {
     toast(error.message);
     return;
   }
+  // An edit made while the answer was on its way is kept.
+  const editedMeanwhile = !!statDraft && draftKey(statDraft) !== before;
+  // Rules that could not be read just now say nothing about what is saved: keep what is on screen.
+  if (fresh.rulesBusy && stat) fresh.rules = stat.rules;
   stat = fresh;
   const saved = draftFrom(stat.rules);
   statSavedKey = draftKey(saved);
-  if (!keepDraft || !statDraft) statDraft = saved;
+  if (!statDraft || !(keepDraft || editedMeanwhile)) statDraft = saved;
   renderStat();
 }
 
@@ -72,9 +77,12 @@ function jobValues(jobId) {
   };
 }
 
-// Same arithmetic as StatTuningRules.Apply: integer rounding, held within one byte.
-const scaledGrowth = (growth, percent) => clampNumber(Math.floor((Math.max(1, growth) * 100 + Math.floor(percent / 2)) / percent), stat.limits.minValue, stat.limits.maxValue);
-const scaledMultiplier = (multiplier, percent) => clampNumber(Math.floor((multiplier * percent + 50) / 100), stat.limits.minValue, stat.limits.maxValue);
+// Same arithmetic as StatTuningRules.Apply: a stat left at 100% keeps the job's value as it is;
+// otherwise integer rounding, held within one byte.
+const scaledGrowth = (growth, percent) => (percent === 100 ? growth
+  : clampNumber(Math.floor((Math.max(1, growth) * 100 + Math.floor(percent / 2)) / percent), stat.limits.minValue, stat.limits.maxValue));
+const scaledMultiplier = (multiplier, percent) => (percent === 100 ? multiplier
+  : clampNumber(Math.floor((multiplier * percent + 50) / 100), stat.limits.minValue, stat.limits.maxValue));
 
 function jobLabel(job) {
   const holders = stat.party.filter((u) => u.jobId === job.job && u.name).map((u) => u.name);
@@ -95,7 +103,7 @@ function characterChoices() {
 
 function updateStatButtons() {
   const dirty = statDirty();
-  $("stat-save").disabled = !dirty;
+  $("stat-save").disabled = !dirty || !!(stat && stat.rulesBusy);
   $("stat-discard").disabled = !dirty;
   for (const refresh of statDerived) refresh();
 }
@@ -128,6 +136,7 @@ function renderStat() {
     el("strong", { text: { error: "Masalah", warning: "Perhatian", info: "Info" }[level] }), el("span", { text: message })));
 
   if (STAT_STATUS[stat.status]) notice(...STAT_STATUS[stat.status]);
+  if (stat.rulesBusy) notice("warning", "Berkas aturan yang tersimpan sedang dipakai program lain dan tidak bisa dibaca. Menyimpan dimatikan agar aturan lama tidak tertimpa; buka tab ini lagi sebentar lagi.");
   if (stat.rulesUnreadable) notice("warning", "Berkas aturan yang tersimpan tidak bisa dibaca dan dianggap kosong. Menyimpan dari sini akan menggantinya.");
   if (stat.status === "ok" && stat.gameRunning) {
     notice("info", "Game sedang berjalan. Aturan yang disimpan langsung dipakai untuk unit yang dibuat sesudahnya: pertarungan berikutnya, atau saat layar Units dibuka lagi. Pertarungan yang sedang berlangsung tidak berubah.");
@@ -202,7 +211,7 @@ function renderCharacterEditor(choices) {
     el("div", { class: "stat-card-head" }, el("h3", { text: "Per karakter" }),
       statCharacter && el("button", { class: "setting-reset", type: "button", text: "Kembalikan karakter ini ke 100%",
         onclick: () => { delete statDraft.characters[statCharacter]; renderStat(); } })),
-    el("p", { class: "stat-help", text: "Persentase di atas nilai job yang sedang dipakai karakter, dan ikut ke job apa pun yang ia pakai nanti. 100% berarti tanpa perubahan; growth 200% berarti tumbuh kira-kira dua kali lebih cepat." }));
+    el("p", { class: "stat-help", text: "Persentase di atas nilai job yang sedang dipakai karakter, dan ikut ke job apa pun yang ia pakai nanti. 100% berarti tanpa perubahan. Kecepatan tumbuh 200% membagi dua angka growth job: efeknya besar di level rendah dan makin kecil di level tinggi (lihat kolom Hasil)." }));
 
   if (!choices.length) {
     card.append(el("p", { class: "stat-help", text: stat.gameRunning
@@ -283,10 +292,13 @@ function renderStatSummary() {
 async function saveStat() {
   if (!statDraft) return;
   $("stat-save").disabled = true;
+  const sent = draftKey(statDraft);
   try {
     stat = await call("saveStatTuning", { rules: rulesFrom(statDraft) });
-    statDraft = draftFrom(stat.rules);
-    statSavedKey = draftKey(statDraft);
+    const saved = draftFrom(stat.rules);
+    statSavedKey = draftKey(saved);
+    // An edit made while the save was on its way stays on screen, still unsaved.
+    if (draftKey(statDraft) === sent) statDraft = saved;
     toast(stat.gameRunning ? "Tersimpan. Berlaku untuk unit yang dibuat sesudah ini." : "Tersimpan. Berlaku saat game dijalankan.", true);
   } catch (error) {
     toast(error.message);

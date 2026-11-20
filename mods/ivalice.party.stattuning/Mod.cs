@@ -96,26 +96,28 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         _gameSize = module.ModuleMemorySize;
 
         // Results arrive in the order the scans were added; the last one activates the mod.
-        scanner.AddMainModuleScan(RosterPattern, r => _roster = RipTarget(r.Found, r.Offset, RosterLeaOffset, 3, 7));
+        scanner.AddMainModuleScan(RosterPattern, r => _roster = RipTarget(r.Found, r.Offset, RosterLeaOffset, 3, 7, 0, RosterLayout.TableSize));
         scanner.AddMainModuleScan(JobTablePattern, r =>
-        {
-            var growthColumns = RipTarget(r.Found, r.Offset, JobTableLeaOffset, 3, 7);
-            if (growthColumns != null) _jobTable = growthColumns - JobTable.GrowthOffset;
-        });
+            _jobTable = RipTarget(r.Found, r.Offset, JobTableLeaOffset, 3, 7, -JobTable.GrowthOffset, JobTable.TableSize));
         scanner.AddMainModuleScan(CopySiteAPattern, r => _siteA = r.Found ? r.Offset + CopySiteAHookOffset : -1);
         scanner.AddMainModuleScan(CopySiteBPattern, r => Activate(_siteA, r.Found ? r.Offset + CopySiteBHookOffset : -1));
     }
 
     private void Log(string message) => _logger.WriteLine($"{Tag} {message}");
 
-    /// <summary>The address a rip-relative instruction inside a pattern match refers to, or null.</summary>
-    private byte* RipTarget(bool found, int matchOffset, int instructionOffset, int displacementOffset, int instructionLength)
+    /// <summary>
+    /// The start of the table a rip-relative instruction inside a pattern match refers to, or null.
+    /// </summary>
+    /// <param name="adjust">Added to the address the instruction names to reach the table's first byte.</param>
+    /// <param name="length">The table's size; all of it must lie inside the game's image.</param>
+    private byte* RipTarget(bool found, int matchOffset, int instructionOffset, int displacementOffset, int instructionLength,
+        int adjust, int length)
     {
         if (!found) return null;
         var instruction = (byte*)(_gameBase + matchOffset + instructionOffset);
-        var target = instruction + instructionLength + *(int*)(instruction + displacementOffset);
-        // An address outside the game's own image means the pattern matched something else.
-        return (nint)target >= _gameBase && (nint)target < _gameBase + _gameSize ? target : null;
+        var start = (nint)(instruction + instructionLength + *(int*)(instruction + displacementOffset)) + adjust;
+        // A table that is not wholly inside the game's own image means the pattern matched something else.
+        return start >= _gameBase && start + length <= _gameBase + _gameSize ? (byte*)start : null;
     }
 
     private void Activate(int siteA, int siteB)
@@ -158,6 +160,15 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         }
         catch (Exception e)
         {
+            // Never leave one of the two places hooked without the other.
+            foreach (var hook in _unitHooks)
+            {
+                try { hook.Disable(); }
+                catch (Exception) { /* Nothing more can be done for this one. */ }
+            }
+            _unitHooks.Clear();
+            _poll?.Dispose();
+            _poll = null;
             Log($"The hooks could not be installed ({e.Message}). The mod is inactive.");
         }
     }
@@ -234,8 +245,17 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         }
         catch (Exception e)
         {
-            if (!_reportedFailure) Log($"Unexpected error; this unit keeps the game's values: {e.Message}");
+            // Set first: if the log itself is what fails, it is not tried again.
+            var first = !_reportedFailure;
             _reportedFailure = true;
+            try
+            {
+                if (first) Log($"Unexpected error while tuning a unit ({e.Message}). The unit may hold the game's values or the tuned ones.");
+            }
+            catch (Exception)
+            {
+                // Nothing may leave this method.
+            }
         }
     }
 

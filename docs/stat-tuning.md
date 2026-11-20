@@ -16,7 +16,7 @@ Raw stats live in the save; growth and multipliers do not. So a growth rule leav
 ## The rules
 
 - **Per job**: replacement values, 1 to 255, for any of the ten numbers. A value left empty keeps the game's own. The rule applies to every unit of the player that currently has that job.
-- **Per character**: percentages, 25 to 400, applied on top of whatever the character's current job gives (after any job rule), and following the character from job to job. Growth 200% divides the growth constant by two, which makes the stat grow roughly twice as fast; multiplier 150% multiplies the job's multiplier by 1.5. Results are rounded and held within 1 to 255.
+- **Per character**: percentages, 25 to 400, applied on top of whatever the character's current job gives (after any job rule), and following the character from job to job. Growth 200% divides the growth constant by two; multiplier 150% multiplies the job's multiplier by 1.5. Results are rounded and held within 1 to 255, and a stat left at 100% keeps the job's byte exactly as it is. Because a level-up divides by `growth + level`, halving the constant matters most at low levels: for a Squire (HP growth 11) it turns `raw / 12` into `raw / 7` at level 1, but only `raw / 61` into `raw / 56` at level 50.
 - **Enemies** keep the game's values, also when they have a job the player changed. One switch ("Aturan job berlaku juga untuk musuh") extends job rules to every unit. Character rules never apply to a unit that is not the player's.
 
 "The player's" means the unit's team bits (battle unit `+0x05`, mask `0x30`) are zero. A character rule also needs the unit's roster slot (`+0x02`) to hold a record with the same character marker; the rule is found by the same fingerprint the Reinkarnasi tab uses (character marker, sex, birthday, name key).
@@ -34,9 +34,11 @@ The mod places an assembly hook right after each of the two copies (on `mov rdx,
 
 The game builds the same kind of unit record for its menus, so the Units screen shows the tuned stats too.
 
+Right after each copy the game calls `0x1EA910`, which can add a signed correction of its own to four of the ten bytes (HP growth, HP multiplier, Speed growth, Speed multiplier), taken from a table indexed by a game setting. The mod's values are therefore the values before that correction, as the job table's own values are. On the save used for testing the correction was zero: the bytes read back from a unit in battle were exactly the ones the rules set.
+
 The hook stub saves and restores `rax`, `rcx`, `rdx`, `r8` to `r11` and `xmm0` to `xmm5` around the call into managed code, for the reason given in [smart-auto-battle.md](smart-auto-battle.md) ("Why the hook saves every register"). The mod tests the stub on a throwaway function before it installs anything and stays inactive if a register is lost.
 
-Addresses are RVAs in `FFT_enhanced.exe` (the build whose title screen reads v1.5.2). The mod finds both copy sites, the roster and the job table by byte patterns, each of which matches exactly once in that executable; if a pattern is missing the mod logs it and stays inactive.
+Addresses are RVAs in `FFT_enhanced.exe` (the build whose title screen reads v1.5.2). The mod finds both copy sites, the roster and the job table by byte patterns, each of which matches exactly once in that executable; if a copy site is missing the mod logs it and stays inactive. Without the roster it runs with job rules only, and without the job table it runs but cannot write `jobs.json`. A roster or job table address is only accepted when the whole table lies inside the game's image.
 
 ## Files
 
@@ -69,6 +71,8 @@ On one Chapter 1 save, with the seven other mods of this project loaded:
 - From the Control Center, with the game running: the tab listed the party, a rule of HP multiplier 150% for Ramza was saved, and reopening the Units screen showed 86 HP (`49 x 1.5 + 13`, rounded down).
 - Two battles were played through with the hooks active, without a crash.
 
+An independent review (GPT 6.2 Astra) found no fault in the hook stub, the stack alignment at both sites or the relocation of the two hooked instructions, and confirmed that all four patterns match exactly once. Its findings in the rules and the app are fixed: a saved rules file that cannot be opened is no longer treated as "no rules" and is never overwritten in that state, an edit made while the app waits for the host is kept, a character stat left at 100% keeps the job's byte, a rules document with lists of the wrong shape is refused instead of read as empty, table addresses are checked over their whole length, and a failed installation of the second hook removes the first.
+
 ## Not verified
 
 - "Aturan job berlaku juga untuk musuh" switched on, in the game. The rule logic is covered by tests only.
@@ -79,6 +83,8 @@ On one Chapter 1 save, with the seven other mods of this project loaded:
 
 ## Limits to know about
 
+- The values in the tab are the ones before the game's own correction described under "How it works"; where that correction is not zero, the HP and Speed numbers the game ends up using differ from the tab's by that amount.
+- Job `0xA1` and the row it switches to at job level 8 (`0xA4`) have no name in the job list and appear as "Job tanpa nama". The "Hasil di job sekarang" column uses the character's job id, so for that one job it does not follow the switch.
 - The game has a second level-up routine that works on a roster record and reads the job table directly (`0x278B24`, called from `0x289F19`). The mod does not cover it. What triggers it was not determined; level-ups earned in battle do not go through it.
 - A battle in progress is not changed by new rules, and neither is a unit that was built before the rules were saved.
 - The Reinkarnasi tab computes its stat preview from the game's own job values, so it does not reflect Stat Tuning.
