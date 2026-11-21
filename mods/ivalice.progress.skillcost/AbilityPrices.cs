@@ -36,10 +36,11 @@ internal static class AbilityPrices
                 throw new InvalidDataException($"Invalid name in Ability row {id}.");
 
             ushort cost = BinaryPrimitives.ReadUInt16LittleEndian(data[(row + PriceOffset)..]);
-            // Zodiark and Ultima are learned in combat. IDs 216–218 are boss commands.
-            // The five remaining IDs are unused in stock job command lists, even when named.
-            bool specialOrUnused = id is 75 or 154 or (>= 216 and <= 218) or 440 or 483 or 497 or 505 or 508;
-            if (!specialOrUnused && data[(int)name] != 0 && cost is > 0 and < 9999)
+            // Among the 9999 JP entries, only Zodiark and Ultima are player-learnable.
+            // Boss commands and priced placeholders outside job command lists keep their costs.
+            bool learnablePrice = cost > 0 && (cost < 9999 || id is 75 or 154);
+            bool bossOrUnused = id is (>= 216 and <= 218) or 440 or 483 or 497 or 505 or 508;
+            if (learnablePrice && !bossOrUnused && data[(int)name] != 0)
                 BinaryPrimitives.WriteUInt16LittleEndian(output.AsSpan(row + PriceOffset), 50);
         }
         return output;

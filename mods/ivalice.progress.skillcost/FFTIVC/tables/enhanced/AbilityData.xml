@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AbilityTable>
+  <Version>1</Version>
+  <Entries>
+    <!-- The stock flags also include DontLearnWithJP. -->
+    <Ability>
+      <Id>75</Id>
+      <Flags>LearnOnHit, DisplayAbilityName</Flags>
+    </Ability>
+    <Ability>
+      <Id>154</Id>
+      <Flags>LearnOnHit, DisplayAbilityName</Flags>
+    </Ability>
+  </Entries>
+</AbilityTable>

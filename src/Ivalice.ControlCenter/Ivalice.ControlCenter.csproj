@@ -9,7 +9,7 @@
     <AssemblyName>IvaliceControlCenter</AssemblyName>
     <RootNamespace>Ivalice.ControlCenter</RootNamespace>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>0.9.0</Version>
+    <Version>0.10.0</Version>
     <Product>Ivalice Control Center</Product>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
