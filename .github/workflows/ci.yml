@@ -35,3 +35,7 @@ jobs:
         run: dotnet build mods/ivalice.party.stattuning -c Release --nologo
         env:
           RELOADEDIIMODS: ${{ runner.temp }}\mods
+      - name: Build All Skills for 50 JP
+        run: dotnet build mods/ivalice.progress.skillcost -c Release --nologo
+        env:
+          RELOADEDIIMODS: ${{ runner.temp }}\mods

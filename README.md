@@ -76,10 +76,15 @@ Rules saved while the game runs are picked up within a second and apply from the
 | Smart Auto Battle | this project | Units fight on their own, healers heal | MIT |
 | Reincarnation | this project | Level 10+ characters restart at level 1 with better starting stats | MIT |
 | Stat Tuning | this project | Stat growth and multipliers per job and per character, for your units only | MIT |
+| All Skills for 50 JP | this project | Learn a paid ability for exactly 50 JP | MIT |
 
 Two Reloaded-II libraries (Signature Scanner and Shared Hooks) are installed as dependencies. Any other mod you drop into the Reloaded-II `Mods` folder also shows up in the app, with an on/off switch.
 
-**Apart from Smart Auto Battle, Reincarnation and Stat Tuning, this repository contains none of these mods.** The install script downloads the ones with open licences from their authors' releases, builds the two GPL mods from their source with a small patch from [`patches/`](patches) (so their multipliers apply to your side only, not to enemies), and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
+The four project mods are included in this repository. The install script downloads third-party mods with open licences from their authors' releases, builds the two GPL mods from their source with a small patch from [`patches/`](patches) (so their multipliers apply to your side only, not to enemies), and installs the two mods without a stated licence only from archives you downloaded yourself from Nexus Mods.
+
+Enable **Mod → Progres → All Skills for 50 JP** before launching Enhanced to use the flat price. Each paid purchase uses 50 JP from the current job. Free abilities keep their original cost. Switching the mod off and restarting restores the original prices while retaining purchases in the save. Global JP Boost can be used alongside it to change how much JP units earn.
+
+The mod changes price fields in the game's shared Ability table. Game routines that spend a JP budget when assigning abilities can also use these prices. Special acquisition rules for Ultima and Zodiark remain in effect. If another mod edits the same JP price, the final value depends on the mod loader's merge settings and load order.
 
 ## Install
 

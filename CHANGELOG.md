@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-11-21
+
+- Add **All Skills for 50 JP** to Control Center's Progres group and the installer. Across the seven Enhanced language tables, 324 eligible stock prices change and nine already cost 50 JP. Paid abilities below 50 JP also use the flat price. Free entries, unused commands and special acquisition rules keep their original values.
+- On a disposable save, Curaja cost 50 JP instead of 800 and the purchase reduced the White Mage balance from 50 to zero. Buying Potion as the last outstanding Chemist ability awarded the game's Mastered badge.
+
 ## [0.8.0] - 2026-11-21
 
 - Smart Auto Battle carries the active turbo speed into the Victory and reward animations on Steam Enhanced v1.5.2 with Improved Fast Forward 0.4.5. The existing **FollowTurbo** switch controls this behavior. Normal-speed results, manual confirmation, the reading timeout and reward accounting are preserved.
