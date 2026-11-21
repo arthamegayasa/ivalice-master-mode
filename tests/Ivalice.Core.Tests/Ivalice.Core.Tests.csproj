@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ivalice.Core\Ivalice.Core.csproj" />
+    <Compile Include="..\..\mods\ivalice.progress.skillcost\AbilityPrices.cs" Link="AbilityPrices.cs" />
   </ItemGroup>
 
 </Project>

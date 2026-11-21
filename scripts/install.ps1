@@ -186,7 +186,8 @@ try {
     foreach ($ownMod in @(
             @{ Id = 'ivalice.battle.smartautobattle'; Name = 'Smart Auto Battle' },
             @{ Id = 'ivalice.party.reincarnation'; Name = 'Reincarnation' },
-            @{ Id = 'ivalice.party.stattuning'; Name = 'Stat Tuning' })) {
+            @{ Id = 'ivalice.party.stattuning'; Name = 'Stat Tuning' },
+            @{ Id = 'ivalice.progress.skillcost'; Name = 'All Skills for 50 JP' })) {
         # A first install switches the mod on; after that the player's own on/off choice is kept.
         $alreadyThere = Test-Path (Join-Path $modsDir $ownMod.Id)
         & $dotnet build (Join-Path $repo "mods\$($ownMod.Id)") -c Release --nologo -v q | Out-Null

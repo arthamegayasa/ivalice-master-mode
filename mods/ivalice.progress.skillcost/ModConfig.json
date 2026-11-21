@@ -1,0 +1,12 @@
+{
+  "ModId": "ivalice.progress.skillcost",
+  "ModName": "All Skills for 50 JP",
+  "ModAuthor": "arthamegayasa",
+  "ModVersion": "0.9.0",
+  "ModDescription": "Sets the price of paid job skills to exactly 50 JP in the Enhanced edition.",
+  "ModDll": "ivalice.progress.skillcost.dll",
+  "ModIcon": "Preview.png",
+  "ModDependencies": ["fftivc.utility.modloader"],
+  "SupportedAppId": ["fft_enhanced.exe"],
+  "ProjectUrl": "https://github.com/arthamegayasa/ivalice-master-mode"
+}

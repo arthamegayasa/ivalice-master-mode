@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ivalice.party.reincarnation
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ivalice.party.stattuning", "mods\ivalice.party.stattuning\ivalice.party.stattuning.csproj", "{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ivalice.progress.skillcost", "mods\ivalice.progress.skillcost\ivalice.progress.skillcost.csproj", "{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -157,6 +159,18 @@ Global
 		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|x64.Build.0 = Release|Any CPU
 		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|x86.ActiveCfg = Release|Any CPU
 		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C}.Release|x86.Build.0 = Release|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Debug|x64.Build.0 = Debug|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Debug|x86.Build.0 = Debug|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Release|x64.ActiveCfg = Release|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Release|x64.Build.0 = Release|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Release|x86.ActiveCfg = Release|Any CPU
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -172,5 +186,6 @@ Global
 		{FD276535-4F5E-43C1-8BFA-11DDF10576FC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{2CEEA851-FC88-41C0-B344-33DC2B92B16D} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
 		{D9338A00-30CC-4A22-895D-D6E00ABD8D2C} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
+		{3E47262F-C1B2-4D51-AFB5-4D8E04C95B61} = {ED7DE66D-1FF1-BCCD-393E-2D4AFCA661A0}
 	EndGlobalSection
 EndGlobal
