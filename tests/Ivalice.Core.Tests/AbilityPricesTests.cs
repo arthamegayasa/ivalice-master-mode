@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Xml.Linq;
 using Ivalice.SkillCost;
 
 namespace Ivalice.Core.Tests;
@@ -13,8 +14,10 @@ public class AbilityPricesTests
     public void Only_the_price_bytes_of_paid_job_skills_change()
     {
         var table = Table();
-        foreach (int id in new[] { 4, 75, 154, 216, 217, 218, 368, 440, 483, 497, 505, 508 })
+        foreach (int id in new[] { 4, 216, 217, 218, 368, 440, 483, 497, 505, 508 })
             WritePrice(table, id, 800);
+        WritePrice(table, 75, 9999);  // Zodiark
+        WritePrice(table, 154, 9999); // Ultima
         WritePrice(table, 1, 50);
         WritePrice(table, 55, 30);
         WritePrice(table, 23, 9999);
@@ -22,7 +25,7 @@ public class AbilityPricesTests
         WriteNameOffset(table, 184, table.Length - 1); // Empty name
         var before = (byte[])table.Clone();
         var expected = (byte[])before.Clone();
-        foreach (int id in new[] { 4, 55, 368 })
+        foreach (int id in new[] { 4, 55, 75, 154, 368 })
             WritePrice(expected, id, 50);
 
         var actual = AbilityPrices.WithFlatPrices(table);
@@ -30,6 +33,22 @@ public class AbilityPricesTests
         Assert.Equal(expected, actual);
         Assert.Equal(before, table);
         Assert.Equal(actual, AbilityPrices.WithFlatPrices(actual));
+    }
+
+    [Fact]
+    public void Only_Zodiark_and_Ultima_gain_JP_learning_and_keep_their_combat_learning_flags()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "FFTIVC", "tables", "enhanced", "AbilityData.xml");
+        var table = XDocument.Load(path).Root!;
+        Assert.Equal("AbilityTable", table.Name.LocalName);
+        Assert.Equal("1", table.Element("Version")?.Value);
+        var abilities = table.Element("Entries")!.Elements("Ability").ToArray();
+        Assert.Equal(new[] { 75, 154 }, abilities.Select(ability => (int)ability.Element("Id")!));
+        foreach (var ability in abilities)
+        {
+            Assert.Equal(new[] { "Id", "Flags" }, ability.Elements().Select(field => field.Name.LocalName));
+            Assert.Equal("LearnOnHit, DisplayAbilityName", ability.Element("Flags")?.Value);
+        }
     }
 
     [Fact]

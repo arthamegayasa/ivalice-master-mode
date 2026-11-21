@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ivalice.Core\Ivalice.Core.csproj" />
     <Compile Include="..\..\mods\ivalice.progress.skillcost\AbilityPrices.cs" Link="AbilityPrices.cs" />
+    <None Include="..\..\mods\ivalice.progress.skillcost\FFTIVC\**\*.xml" Link="FFTIVC\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

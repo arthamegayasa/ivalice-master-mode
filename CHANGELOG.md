@@ -2,6 +2,10 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-11-21
+
+- Extend **All Skills for 50 JP** to the hidden job abilities Zodiark (Summoner) and Ultima (Ramza's Mettle). Buy them in Learn for 50 JP each to complete the job's ability list.
+
 ## [0.9.0] - 2026-11-21
 
 - Add **All Skills for 50 JP** to Control Center's Progres group and the installer. Across the seven Enhanced language tables, 324 eligible stock prices change and nine already cost 50 JP. Paid abilities below 50 JP also use the flat price. Free entries, unused commands and special acquisition rules keep their original values.
