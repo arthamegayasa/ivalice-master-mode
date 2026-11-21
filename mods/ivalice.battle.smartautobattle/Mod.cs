@@ -69,6 +69,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     private IAsmHook? _tickCountHook;
     private IReverseWrapper<AdjustTickCount>? _adjustTickCount;
     private readonly TurboFollower _turboFollower = new();
+    private TurboModState? _resultTurbo;
+    private ResultAnimationClock? _resultClock;
     private byte** _speedManagerGlobal;
     private int* _battleStateGlobal;
     private delegate* unmanaged<byte*> _getActiveActor;
@@ -178,6 +180,17 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             catch (Exception e)
             {
                 _logger.WriteLine($"{Tag} Turbo follow could not be installed ({e.Message}); auto-battle itself is not affected.");
+                return;
+            }
+            try
+            {
+                _resultTurbo = new TurboModState(context.ModLoader);
+                _resultClock = new ResultAnimationClock(_hooks, gameBase);
+                _logger.WriteLine($"{Tag} Victory and reward animation clock ready.");
+            }
+            catch (Exception e)
+            {
+                _logger.WriteLine($"{Tag} Victory and reward speed unavailable: {e.Message}");
             }
         });
     }
@@ -211,7 +224,14 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             var logging = _configuration.DebugLog;
 
             var speedManager = *_speedManagerGlobal;
-            if (speedManager == null) return iterations;
+            if (speedManager == null)
+            {
+                _resultClock?.Reset();
+                return iterations;
+            }
+            var context = *(int*)(speedManager + SpeedContextOffset);
+            var state = *_battleStateGlobal;
+            _resultClock?.Update(context, state, _resultTurbo?.Multiplier ?? 1, follow);
 
             ActingUnit? acting = null;
             var actor = _getActiveActor();
@@ -226,7 +246,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             }
 
             var adjusted = _turboFollower.Adjust(
-                iterations, *(int*)(speedManager + SpeedContextOffset), *_battleStateGlobal, acting, follow);
+                iterations, context, state, acting, follow);
             if (logging) LogHoldDuration(acting, *_battleStateGlobal, iterations, adjusted);
             else _holdStartedAt = 0;
             return adjusted;
@@ -234,6 +254,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         catch (Exception e)
         {
             if (!_reportedFailure) _logger.WriteLine($"{Tag} Unexpected error in turbo follow, speed left alone: {e.Message}");
+            _resultClock?.Reset();
             _reportedFailure = true;
             return iterations;
         }

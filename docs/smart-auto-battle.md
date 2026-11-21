@@ -37,6 +37,14 @@ Measured in play at 6x: the state-25 hold took 3037 ms without turbo follow and 
 
 The signatures used (each matches once): the task runner call site `4C 8B 05 ?? ?? ?? ?? 49 8B C8 E8 ?? ?? ?? ?? 45 33 FF 44 8B F0`, the function returning the acting unit's scene object, and a read of the battle state variable.
 
+### Victory and rewards
+
+With **FollowTurbo** enabled, the BattleResult layout carries over the turbo speed from the end of combat. Improved Fast Forward 0.4.5 switches itself off when a battle enters an event. An ordinary victory enters event context 2, battle state 52. Smart Auto Battle reads the optional mod's switch and factor during combat, then scales the time step of the visible results layout. The game continues to process input, grant rewards and manage its reading timeout on its normal clocks.
+
+The animation hook checks the Enhanced v1.5.2 executable hash and instruction bytes. Its scope is the active BattleResult layout with the expected presenter type. Other layouts retain their normal time step. The optional turbo binding checks the installed mod and assembly versions. A missing or unsupported turbo integration leaves results at normal speed.
+
+On 2026-11-21, the same Mandalia Plain autosave yielded 3,000 gil and named Ramza as the greatest contributor. At 6×, the interval from the first Victory animation to **Next** dropped from 6.81 seconds to 1.14 seconds. From entry into the results event, including its initial transition, the times were 7.79 and 2.12 seconds. With turbo off, the animation still took 6.81 seconds. The visible reading window before automatic dismissal was 10.16 seconds in both 6× runs, and a single confirmation advanced the summary early. This test covered a random encounter with a gil reward. Story-specific transitions and the final battle were not timed.
+
 ## Limits to know about
 
 - While the mod is on, choosing Manual in the in-game Auto-battle menu does not stick: the game stores Manual as "no mode", and the mod fills that in again. Use the toggle to take control back.

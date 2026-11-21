@@ -35,8 +35,8 @@ public class Config : Configurable<Config>
     [DefaultValue(true)]
     public bool ReviveFallenAllies { get; set; } = true;
 
-    [DisplayName("Keep turbo speed on auto-battle")]
-    [Description("With Improved Fast Forward on, units on auto-battle are fast-forwarded like enemies instead of pausing before each action.")]
+    [DisplayName("Follow turbo in auto-battle and battle results")]
+    [Description("Uses the active turbo speed for auto-battle turns and for the Victory and reward animations. Confirm the results when you are ready.")]
     [DefaultValue(true)]
     public bool FollowTurbo { get; set; } = true;
 

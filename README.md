@@ -32,6 +32,8 @@ Press **F8** or click both sticks (**L3 + R3**) to switch it off and on during p
 
 With Improved Fast Forward on, units on auto-battle keep the turbo speed. Without this, the game pauses about three seconds before each of their actions, because the turbo mod holds those moments at normal speed for any unit the player owns.
 
+Victory and reward animations also follow the turbo speed that was active at the end of the battle. You can advance the completed summary with the usual confirmation button. Toggle this behavior under **Smart Auto Battle → Ikuti turbo saat auto battle dan hasil pertarungan**. Result animation support is verified for Improved Fast Forward 0.4.5 and Steam Enhanced v1.5.2.
+
 **Status: tested in random battles on one save.** Units acted on their own from the first turn, a healer switched to saving a wounded ally, and F8 handed control back. Story battles with guests and special win conditions have not been tried, so save before using it there. The game still stops for its own pop-ups (for example when a unit finds an item) until you confirm them. [How it works](docs/smart-auto-battle.md) lists the evidence, the known limits and what is still unconfirmed.
 
 ## Reincarnation

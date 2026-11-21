@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-11-21
+
+- Smart Auto Battle carries the active turbo speed into the Victory and reward animations on Steam Enhanced v1.5.2 with Improved Fast Forward 0.4.5. The existing **FollowTurbo** switch controls this behavior. Normal-speed results, manual confirmation, the reading timeout and reward accounting are preserved.
+- In a replayed Mandalia Plain battle at 6×, Victory through the **Next** prompt took 1.14 seconds versus 6.81 seconds before. Both runs awarded 3,000 gil once.
+
 ## [0.7.0] - 2026-11-21
 
 - Add five independent **Batas stat party** switches to Stat Tuning. The available ceilings are HP 9,999, MP 9,999, Speed 99, PA 255 and MA 255. They keep existing raw stats, job multipliers, growth and reincarnation calculations. Existing profiles start with all five switches off.
