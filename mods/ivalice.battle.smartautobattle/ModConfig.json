@@ -2,7 +2,7 @@
   "ModId": "ivalice.battle.smartautobattle",
   "ModName": "Smart Auto Battle",
   "ModAuthor": "arthamegayasa",
-  "ModVersion": "0.3.0",
+  "ModVersion": "0.8.0",
   "ModDescription": "Switches your units to the game's own auto-battle when a fight starts and picks the mode by role: healers save fading allies, everyone else fights. Toggle with F8 or L3+R3.",
   "ModDll": "ivalice.battle.smartautobattle.dll",
   "ModIcon": "Preview.png",

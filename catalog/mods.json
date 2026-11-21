@@ -133,7 +133,7 @@
         { "key": "HealWithWhiteMagicks", "type": "bool", "label": "Pengguna White Magicks adalah penyembuh", "help": "Berlaku untuk skillset utama maupun kedua.", "default": true },
         { "key": "HealWithItems", "type": "bool", "label": "Pengguna Items adalah penyembuh", "help": "Berlaku untuk skillset utama maupun kedua.", "default": true },
         { "key": "HealWithMartialArts", "type": "bool", "label": "Pengguna Martial Arts adalah penyembuh", "help": "Untuk Monk dengan Chakra dan Revive.", "default": false },
-        { "key": "FollowTurbo", "type": "bool", "label": "Ikut kecepatan turbo saat auto battle", "help": "Dengan Improved Fast Forward menyala, unit yang sedang auto battle ikut dipercepat seperti musuh, tanpa jeda sekitar 3 detik sebelum tiap aksi.", "default": true },
+        { "key": "FollowTurbo", "type": "bool", "label": "Ikuti turbo saat auto battle dan hasil pertarungan", "help": "Saat turbo menyala, giliran auto battle, tulisan Victory, dan tampilan hadiah mengikuti kecepatan turbo. Tekan konfirmasi setelah selesai membaca hasil.", "default": true },
         { "key": "ReviveFallenAllies", "type": "bool", "label": "Penyembuh menolong teman yang tumbang", "help": "Matikan jika penyembuh Anda tidak membawa Phoenix Down dan tidak punya Raise, agar mereka tetap menyerang.", "default": true },
         { "key": "ToggleWithF8", "type": "bool", "label": "Saklar dengan F8", "help": "Tekan F8 saat jendela game aktif. F8 selalu berfungsi jika saklar stik dimatikan.", "default": true, "advanced": true },
         { "key": "ToggleWithSticks", "type": "bool", "label": "Saklar dengan kedua stik", "help": "Klik stik kiri dan kanan bersamaan (L3 + R3).", "default": true, "advanced": true },
