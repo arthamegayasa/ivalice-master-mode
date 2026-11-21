@@ -9,13 +9,13 @@ public readonly record struct JobGrowth(StatBlock Growth, StatBlock Multiplier)
     private static readonly StatBlock Caps = new(999, 999, 50, 99, 99);
 
     /// <summary>The stat values the game shows for these raw stats, before equipment.</summary>
-    public StatBlock Shown(StatBlock raw)
+    public StatBlock Shown(StatBlock raw, PlayerStatLimits? limits = null)
     {
         var multiplier = Multiplier;
         return StatBlock.From(i =>
         {
             var shown = (int)(((long)raw[i] * multiplier[i] / 100) >> 14);
-            return Math.Clamp(shown, 1, Caps[i]);
+            return Math.Clamp(shown, 1, limits?.CapFor(i, Caps[i]) ?? Caps[i]);
         });
     }
 }

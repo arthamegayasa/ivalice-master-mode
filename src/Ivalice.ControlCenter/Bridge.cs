@@ -122,11 +122,13 @@ public sealed class Bridge
         if (layout is null)
             return new { version, reloadedFound = false, gameRunning = false, state = (AppState?)null, layout = (object?)null };
 
+        var processIds = GameProcessIds();
         return new
         {
             version,
             reloadedFound = true,
-            gameRunning = IsGameRunning(),
+            gameRunning = processIds.Count > 0,
+            playerLimitsReady = processIds.Count == 1 && PlayerLimitsReady(processIds[0]),
             state = (AppState?)new ModManager(layout, _catalog).GetState(),
             layout = (object?)new { layout.ModsDirectory, layout.LogsDirectory, layout.LauncherPath },
         };
@@ -140,6 +142,22 @@ public sealed class Bridge
         var ids = found.Select(p => p.Id).ToList();
         foreach (var p in found) p.Dispose();
         return ids;
+    }
+
+    private bool PlayerLimitsReady(int processId)
+    {
+        var signal = ReadTextOrNull(_statPaths.LimitsReadyFile);
+        if (signal is null) return false;
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return PlayerLimitSession.IsReady(signal, processId, process.StartTime.ToUniversalTime().Ticks);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // The game may have exited since enumeration, or Windows may deny access to its start time.
+            return false;
+        }
     }
 
     // ---- Reincarnation: talks to the mod inside the game through the files in BridgePaths ----
@@ -175,15 +193,21 @@ public sealed class Bridge
 
         var usable = reading?.Status is FeedStatus.Ok or FeedStatus.Stale;
         var roster = usable ? reading!.Roster : null;
+        var playerLimitsUnconfirmed = false;
         if (roster is not null && mods!.Any(m => m.Id == StatTuningMod && m.Installed && m.Enabled)
             && StatTuningRules.Parse(ReadTextOrNull(_statPaths.RulesFile)) is { IsEmpty: false } tuning)
-            roster = TunedRoster.Apply(roster, tuning, ReadJobs());
+        {
+            var limitsReady = tuning.PlayerLimits.AnyEnabled && PlayerLimitsReady(roster.ProcessId);
+            playerLimitsUnconfirmed = tuning.PlayerLimits.AnyEnabled && !limitsReady;
+            roster = TunedRoster.Apply(roster, tuning, ReadJobs(), playerLimitsReady: limitsReady);
+        }
 
         return new
         {
             status,
             ageSeconds = usable ? reading!.AgeSeconds : null,
             roster,
+            playerLimitsUnconfirmed,
             statTuningApplied = usable && !ReferenceEquals(roster, reading!.Roster),
             commandPending = File.Exists(_paths.CommandFile),
             rules = new
@@ -282,13 +306,14 @@ public sealed class Bridge
         {
             var reading = RosterFeed.Evaluate(ReadTextOrNull(_paths.RosterFile), DateTimeOffset.UtcNow, processIds);
             if (reading.Status is FeedStatus.Ok or FeedStatus.Stale)
-                party.AddRange(reading.Roster!.Units.Select(u => (object)new { u.Fingerprint, u.Name, u.JobId, u.JobName, u.Level, u.Slot }));
+                party.AddRange(reading.Roster!.Units.Select(u => (object)new { u.Fingerprint, u.Name, u.JobId, u.EffectiveJobRow, u.JobName, u.Level, u.Slot }));
         }
 
         return new
         {
             status,
             gameRunning = processIds.Count > 0,
+            playerLimitsReady = processIds.Count == 1 && PlayerLimitsReady(processIds[0]),
             jobs = ReadJobs().Values,
             rules = JsonNode.Parse((rules ?? StatTuningRules.Empty).Serialize()),
             rulesUnreadable = rulesText is not null && rules is null,

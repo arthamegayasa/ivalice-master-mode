@@ -128,7 +128,7 @@ function renderHeader() {
   $("footer-note").textContent = onReincarnation
     ? "Reinkarnasi berlaku langsung di game yang sedang berjalan. Simpan game agar permanen."
     : onStat
-      ? "Aturan stat yang disimpan dipakai game tanpa perlu ditutup, untuk unit yang dibuat sesudahnya."
+      ? "Tekan Simpan untuk menyimpan draf aturan stat."
     : snapshot.gameRunning
       ? "Game sedang berjalan. Perubahan berlaku setelah game ditutup dan dijalankan lagi."
       : "Perubahan berlaku saat game dijalankan berikutnya.";
@@ -354,7 +354,7 @@ function renderReinc(force) {
   if (!reinc) return;
   // The age is left out so a quiet game does not rebuild the cards on every poll.
   const stale = reinc.status === "stale";
-  const key = JSON.stringify([reinc.status, reinc.statTuningApplied, reinc.commandPending, stale && Math.round(reinc.ageSeconds / 10),
+  const key = JSON.stringify([reinc.status, reinc.statTuningApplied, reinc.playerLimitsUnconfirmed, reinc.commandPending, stale && Math.round(reinc.ageSeconds / 10),
     reinc.roster && [reinc.roster.safeMode, reinc.roster.game, reinc.roster.units], reincBusy && reincBusy.commandId]);
   renderWaiting();
   if (!force && key === reincShown) return;
@@ -376,7 +376,8 @@ function renderReinc(force) {
   if (stale) {
     notice("warning", `Game belum memperbarui data selama ${Math.round(reinc.ageSeconds)} detik. Game mungkin sedang dijeda karena jendelanya tidak aktif; perintah baru dijalankan saat game aktif lagi.`);
   }
-  if (reinc.statTuningApplied) notice("info", "Stat saat ini dan pratinjau level 1 memperhitungkan aturan Stat Tuning yang berlaku untuk karakter.");
+  if (reinc.statTuningApplied) notice("info", "Pratinjau stat saat ini dan level 1 memperhitungkan aturan Stat Tuning yang tersimpan.");
+  if (reinc.playerLimitsUnconfirmed) notice("warning", "Dukungan batas stat belum terkonfirmasi pada sesi game ini. Pratinjau memakai batas bawaan game.");
   if (roster.safeMode) notice("info", "Mode aman menyala: mod memeriksa perintah dan menjawab apa yang akan terjadi, tetapi tidak mengubah apa pun di game.");
   if (roster.game.inBattle) notice("info", "Game sedang dalam pertarungan atau adegan cerita. Reinkarnasi bisa dilakukan setelah kembali ke peta dunia.");
   if (roster.units.length === 0) {
@@ -580,6 +581,11 @@ async function refresh(full) {
     const fresh = await call("getState");
     const before = snapshot && JSON.stringify(snapshot.state);
     snapshot = fresh;
+    if (currentTab === "stat" && stat) {
+      stat.gameRunning = fresh.gameRunning;
+      stat.playerLimitsReady = fresh.playerLimitsReady;
+      updatePlayerLimitStatus(stat.gameRunning, stat.playerLimitsReady);
+    }
     // Avoid rebuilding the cards under the user's cursor unless something actually changed on disk.
     if (full || before !== JSON.stringify(fresh.state)) render();
     else { renderHeader(); }

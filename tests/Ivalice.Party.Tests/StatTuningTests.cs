@@ -204,6 +204,7 @@ public class StatTuningTests
         var identity = TunedUnit.Identify(unit, roster);
 
         Assert.True(identity.PlayerOwned);
+        Assert.True(TunedUnit.IsPartyMember(unit, roster));
         Assert.Equal(Squire, identity.JobRow);
         Assert.Equal(StampCodec.FingerprintText(record), identity.Fingerprint);
     }
@@ -217,7 +218,19 @@ public class StatTuningTests
         var identity = TunedUnit.Identify(unit, Fake.Roster(record));
 
         Assert.False(identity.PlayerOwned);
+        Assert.False(TunedUnit.IsPartyMember(unit, Fake.Roster(record)));
         Assert.Null(identity.Fingerprint);
+    }
+
+    [Fact]
+    public void A_guest_has_a_valid_identity_but_is_excluded_from_player_stat_limits()
+    {
+        var record = Fake.Unit(slot: RosterLayout.PartySlots);
+        var unit = BattleUnit(record[RosterLayout.Marker], RosterLayout.PartySlots, Squire);
+        var identity = TunedUnit.Identify(unit, Fake.Roster(record));
+        Assert.True(identity.PlayerOwned);
+        Assert.NotNull(identity.Fingerprint);
+        Assert.False(TunedUnit.IsPartyMember(unit, Fake.Roster(record)));
     }
 
     [Fact]
@@ -230,6 +243,10 @@ public class StatTuningTests
         Assert.Null(TunedUnit.Identify(other, Fake.Roster(record)).Fingerprint);
         Assert.Null(TunedUnit.Identify(outside, Fake.Roster(record)).Fingerprint);
         Assert.Null(TunedUnit.Identify(BattleUnit(record[RosterLayout.Marker], 3, Squire), ReadOnlySpan<byte>.Empty).Fingerprint);
+        Assert.False(TunedUnit.IsPartyMember(other, Fake.Roster(record)));
+        Assert.False(TunedUnit.IsPartyMember(outside, Fake.Roster(record)));
+        Assert.False(TunedUnit.IsPartyMember(ReadOnlySpan<byte>.Empty, Fake.Roster(record)));
+        Assert.False(TunedUnit.IsPartyMember(BattleUnit(record[RosterLayout.Marker], 3, Squire), ReadOnlySpan<byte>.Empty));
     }
 
     [Fact]

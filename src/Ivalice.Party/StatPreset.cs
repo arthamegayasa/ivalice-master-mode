@@ -59,7 +59,7 @@ public sealed record StatPreset(PresetScope Scope, int[] Stats, int? GrowthPerce
             if (rule.IsEmpty) jobs.Remove(job.Job);
             else jobs[job.Job] = rule;
         }
-        return new(draft.ApplyJobsToEnemies, jobs, draft.Characters);
+        return new(draft.ApplyJobsToEnemies, jobs, draft.Characters, draft.PlayerLimits);
     }
 
     private static int? Override(int original, int scaled) => original == 0 || original == scaled ? null : scaled;

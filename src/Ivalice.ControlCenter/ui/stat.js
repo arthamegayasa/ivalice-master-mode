@@ -4,13 +4,18 @@
 // Loaded after app.js and uses its helpers (call, el, $, toast). The rules are checked and written by
 // the desktop host (Ivalice.Party.StatTuningRules); this page edits a draft of them.
 let stat = null;        // last answer of getStatTuning
-let statDraft = null;   // { applyJobsToEnemies, jobs: { [id]: { growth, multiplier } }, characters: { [fingerprint]: { name, growthPercent, multiplierPercent } } }
+let statDraft = null;   // Editable player limits and rules indexed by job id or character fingerprint.
 let statSavedKey = "";  // the saved rules, to tell whether the draft differs
 let statJob = null;     // job id shown in the job editor
 let statCharacter = null; // fingerprint shown in the character editor
 let statDerived = [];   // functions that refresh numbers computed from the draft
 
 const STAT_NAMES = ["HP", "MP", "Speed", "Serangan fisik (PA)", "Serangan sihir (MA)"];
+const PLAYER_LIMITS = [
+  { key: "hp", label: "HP", cap: "9.999" }, { key: "mp", label: "MP", cap: "9.999" },
+  { key: "speed", label: "Speed", cap: "99" }, { key: "pa", label: "PA", cap: "255" },
+  { key: "ma", label: "MA", cap: "255" },
+];
 const STAT_GROUPS = [["generic", "Job umum"], ["special", "Job khusus karakter"], ["monster", "Monster"]];
 const STAT_STATUS = {
   modNotInstalled: ["warning", "Mod Stat Tuning belum terpasang. Jalankan scripts/install.ps1 dari repositori."],
@@ -32,7 +37,9 @@ const signed = (value) => (value > 0 ? "+" + value : String(value));
 const clampNumber = (value, low, high) => Math.min(high, Math.max(low, value));
 
 function draftFrom(rules) {
-  const draft = { applyJobsToEnemies: !!rules.applyJobsToEnemies, jobs: {}, characters: {} };
+  const limits = rules.playerLimits || {};
+  const playerLimits = Object.fromEntries(PLAYER_LIMITS.map(({ key }) => [key, limits[key] === true]));
+  const draft = { applyJobsToEnemies: !!rules.applyJobsToEnemies, playerLimits, jobs: {}, characters: {} };
   for (const job of rules.jobs || []) {
     draft.jobs[job.job] = { growth: [...job.growth], multiplier: [...job.multiplier], move: wholeOr(job.move, null), jump: wholeOr(job.jump, null) };
   }
@@ -49,6 +56,7 @@ function rulesFrom(draft) {
   return {
     schema: 1,
     applyJobsToEnemies: draft.applyJobsToEnemies,
+    playerLimits: { ...draft.playerLimits },
     jobs: Object.entries(draft.jobs).filter(([, rule]) => jobChanged(rule))
       .map(([job, rule]) => ({ job: Number(job), growth: rule.growth, multiplier: rule.multiplier, move: rule.move, jump: rule.jump })),
     characters: Object.entries(draft.characters).filter(([, rule]) => characterChanged(rule))
@@ -157,9 +165,10 @@ function renderStat() {
   if (stat.rulesBusy) notice("warning", "Berkas aturan yang tersimpan sedang dipakai program lain dan tidak bisa dibaca. Menyimpan dimatikan agar aturan lama tidak tertimpa; buka tab ini lagi sebentar lagi.");
   if (stat.rulesUnreadable) notice("warning", "Berkas aturan yang tersimpan tidak bisa dibaca dan dianggap kosong. Menyimpan dari sini akan menggantinya.");
   if (stat.status === "ok" && stat.gameRunning) {
-    notice("info", "Game sedang berjalan. Aturan yang disimpan langsung dipakai untuk unit yang dibuat sesudahnya: pertarungan berikutnya, atau saat layar Units dibuka lagi. Pertarungan yang sedang berlangsung tidak berubah.");
+    notice("info", "Game sedang berjalan. Aturan job dan karakter dibaca saat game membentuk unit, misalnya pada pertarungan berikutnya atau saat layar Units dibuka lagi.");
   }
 
+  body.append(renderPlayerLimits());
   if (stat.jobs.length === 0) {
     body.append(el("div", { class: "empty" }, el("h2", { text: "Nilai bawaan job belum terbaca" }),
       el("p", { text: "Jalankan game sekali dengan mod Stat Tuning aktif (cukup sampai layar judul). Mod mencatat nilai growth dan multiplier asli tiap job, lalu daftar job muncul di sini." })));
@@ -184,6 +193,31 @@ function renderStat() {
     el("p", { class: "reinc-foot", text: "Move dan Jump: yang diatur di sini adalah nilai dasar dari job. Bonus dari perlengkapan dan ability (misalnya sepatu atau Move +1) tetap ditambahkan game di atasnya, jadi angka di game bisa lebih tinggi." }),
     el("p", { class: "reinc-foot", text: "Growth: angka lebih kecil berarti tumbuh lebih cepat. Tiap naik level, stat dasar bertambah sebesar stat dasar ÷ (growth + level). Mengubah growth hanya memengaruhi kenaikan level sesudahnya; level yang sudah didapat tidak dihitung ulang. Multiplier: persen dari stat dasar yang dipakai game, jadi perubahannya langsung terasa. Nilai Speed, PA, dan MA yang tampil di game dibulatkan ke bawah, jadi perubahan kecil bisa belum terlihat." }));
   updateStatButtons();
+}
+
+function renderPlayerLimits() {
+  const limits = statDraft.playerLimits;
+  const checks = PLAYER_LIMITS.map(({ key, label, cap }) => el("label", { class: "stat-check" },
+    el("input", { type: "checkbox", checked: limits[key], onchange: e => {
+      limits[key] = e.target.checked;
+      updateStatButtons();
+    } }), label + " " + cap));
+  const card = el("article", { class: "card stat-card" },
+    el("div", { class: "stat-card-head" }, el("h3", { text: "Batas stat party" })),
+    el("p", { class: "stat-help", text: "Centang stat untuk menaikkan batasnya, lalu tekan Simpan. HP dan MP mendapat batas 9.999. Dengan stat dasar dan multiplier bawaan, hasil perhitungan sebelum perlengkapan paling tinggi 2.611." }),
+    el("div", { class: "preset-checks", role: "group", "aria-label": "Batas stat party" }, checks),
+    el("p", { class: "stat-help", id: "player-limits-status", role: "status" }));
+  updatePlayerLimitStatus(stat.gameRunning, stat.playerLimitsReady, card.querySelector("#player-limits-status"));
+  return card;
+}
+
+function updatePlayerLimitStatus(running, ready, status = $("player-limits-status")) {
+  if (!status) return;
+  status.hidden = !running;
+  const message = !running ? "" : ready
+    ? "Game mengonfirmasi dukungan batas stat untuk sesi ini."
+    : "Dukungan batas stat belum terkonfirmasi pada sesi game ini. Pilihan tetap dapat disimpan. Periksa tab Log jika status ini berlanjut.";
+  if (status.textContent !== message) status.textContent = message;
 }
 
 const presetForm = { scope: "generic", stats: statValues(true), growthPercent: 100, multiplierPercent: 100, moveBonus: 0, jumpBonus: 0 };
@@ -345,6 +379,8 @@ function renderCharacterEditor(choices) {
 
   const rule = () => statDraft.characters[statCharacter] || (statDraft.characters[statCharacter] = blankCharacter(choice.unit ? choice.unit.name : choice.name));
   const current = statDraft.characters[statCharacter] || blankCharacter();
+  // Earlier roster feeds did not identify the effective row of job 0xA1 after job level 8.
+  const jobRow = choice.unit?.effectiveJobRow ?? (choice.unit?.jobId === 0xA1 ? null : choice.unit?.jobId);
   const low = stat.limits.minPercent, high = stat.limits.maxPercent;
   const rows = STAT_NAMES.map((name, i) => {
     const mark = (input, value) => input.classList.toggle("changed", value !== 100);
@@ -357,7 +393,7 @@ function renderCharacterEditor(choices) {
 
     const result = el("td", { class: "num muted" });
     statDerived.push(() => {
-      const values = choice.unit ? jobValues(choice.unit.jobId) : null;
+      const values = jobValues(jobRow);
       const now = statDraft.characters[statCharacter] || blankCharacter();
       result.textContent = values
         ? `growth ${scaledGrowth(values.growth[i], now.growthPercent[i])} · ×${scaledMultiplier(values.multiplier[i], now.multiplierPercent[i])}%`
@@ -378,7 +414,7 @@ function renderCharacterEditor(choices) {
     mark(input, current[m.bonusKey]);
     const result = el("td", { class: "num muted" });
     statDerived.push(() => {
-      const values = choice.unit ? jobValues(choice.unit.jobId) : null;
+      const values = jobValues(jobRow);
       const now = statDraft.characters[statCharacter] || blankCharacter();
       const base = values ? values[m.key] : 0;
       // Same rule as StatTuningRules.ApplyMovement: a bonus of 0 keeps the job's value as it is.
@@ -399,6 +435,11 @@ function renderStatSummary() {
   const card = el("article", { class: "card stat-card" }, el("div", { class: "stat-card-head" }, el("h3", { text: "Yang sedang diubah" })), list);
   const refresh = () => {
     const items = [];
+    const selected = PLAYER_LIMITS.filter(({ key }) => statDraft.playerLimits[key]);
+    if (selected.length) {
+      const parts = selected.map(({ label, cap }) => label + " " + cap);
+      items.push(el("li", {}, el("b", { text: "Batas stat party" }), " — " + parts.join(", ")));
+    }
     for (const [id, rule] of Object.entries(statDraft.jobs)) {
       if (!jobChanged(rule)) continue;
       const job = stat.jobs.find((j) => j.job === Number(id));
@@ -443,7 +484,7 @@ async function saveStat() {
     statSavedKey = draftKey(saved);
     // An edit made while the save was on its way stays on screen, still unsaved.
     if (draftKey(statDraft) === sent) statDraft = saved;
-    toast(stat.gameRunning ? "Tersimpan. Berlaku untuk unit yang dibuat sesudah ini." : "Tersimpan. Berlaku saat game dijalankan.", true);
+    toast("Aturan stat tersimpan.", true);
   } catch (error) {
     toast(error.message);
   }

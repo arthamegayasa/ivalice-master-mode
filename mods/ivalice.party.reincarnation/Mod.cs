@@ -21,7 +21,7 @@ namespace ivalice.party.reincarnation;
 public unsafe class Mod : ModBase // <= Do not Remove.
 {
     private const string Tag = "[Reincarnation]";
-    private const string ModVersion = "0.4.0";
+    private const string ModVersion = "0.7.0";
 
     // A function that finds a free roster slot; the roster's address is the target of the
     // "lea rcx, [rip+disp]" found RosterLeaOffset bytes into the match.

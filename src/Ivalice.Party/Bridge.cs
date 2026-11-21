@@ -88,6 +88,8 @@ public sealed record JournalEntry(
 [JsonSerializable(typeof(ReincarnationCommand))]
 [JsonSerializable(typeof(CommandResult))]
 [JsonSerializable(typeof(JournalEntry))]
+[JsonSerializable(typeof(PlayerStatLimits))]
+[JsonSerializable(typeof(PlayerLimitSession))]
 public sealed partial class BridgeJson : JsonSerializerContext;
 
 /// <summary>How fresh and how trustworthy the roster.json on disk is.</summary>

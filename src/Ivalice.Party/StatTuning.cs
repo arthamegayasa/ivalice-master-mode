@@ -61,14 +61,17 @@ public sealed class StatTuningRules
     /// <summary>Keyed by the unit fingerprint the roster feed shows (eight hex digits, upper case).</summary>
     public IReadOnlyDictionary<string, CharacterTuning> Characters { get; }
 
-    public bool IsEmpty => Jobs.Count == 0 && Characters.Count == 0;
+    public PlayerStatLimits PlayerLimits { get; }
+
+    public bool IsEmpty => Jobs.Count == 0 && Characters.Count == 0 && !PlayerLimits.AnyEnabled;
 
     public StatTuningRules(bool applyJobsToEnemies, IReadOnlyDictionary<int, JobTuning> jobs,
-        IReadOnlyDictionary<string, CharacterTuning> characters)
+        IReadOnlyDictionary<string, CharacterTuning> characters, PlayerStatLimits? playerLimits = null)
     {
         ApplyJobsToEnemies = applyJobsToEnemies;
         Jobs = jobs;
         Characters = characters;
+        PlayerLimits = playerLimits ?? PlayerStatLimits.Default;
     }
 
     /// <summary>
@@ -203,7 +206,13 @@ public sealed class StatTuningRules
                 }
             }
 
-            return new StatTuningRules(toEnemies, jobs, characters);
+            var limits = PlayerStatLimits.Default;
+            if (root.TryGetProperty("playerLimits", out var limitSettings))
+            {
+                if (limitSettings.ValueKind != JsonValueKind.Object) return null;
+                limits = limitSettings.Deserialize(BridgeJson.Default.PlayerStatLimits)!;
+            }
+            return new StatTuningRules(toEnemies, jobs, characters, limits);
         }
         catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException or OverflowException or ArgumentException)
         {
@@ -253,6 +262,8 @@ public sealed class StatTuningRules
             writer.WriteStartObject();
             writer.WriteNumber("schema", CurrentSchema);
             writer.WriteBoolean("applyJobsToEnemies", ApplyJobsToEnemies);
+            writer.WritePropertyName("playerLimits");
+            JsonSerializer.Serialize(writer, PlayerLimits, BridgeJson.Default.PlayerStatLimits);
 
             writer.WriteStartArray("jobs");
             foreach (var (row, job) in Jobs.OrderBy(j => j.Key))
@@ -324,16 +335,21 @@ public readonly record struct TunedUnit(int JobRow, bool PlayerOwned, string? Fi
         var row = job == SpecialJob && (unit[SpecialJobLevel] & 0x0F) >= 8 ? SpecialJobUpgradedRow : job;
         var playerOwned = (unit[Flags] & TeamMask) == 0;
 
-        string? fingerprint = null;
-        var slot = unit[RosterSlot];
-        if (playerOwned && slot < RosterLayout.Capacity && roster.Length == RosterLayout.TableSize)
-        {
-            var record = RosterLayout.Record(roster, slot);
-            if (RosterRecord.Holds(record, slot) && SameCharacter(record[RosterLayout.Marker], unit[Marker]))
-                fingerprint = StampCodec.FingerprintText(record);
-        }
+        var record = MatchedRosterRecord(unit, roster);
+        return new TunedUnit(row, playerOwned, record.IsEmpty ? null : StampCodec.FingerprintText(record));
+    }
 
-        return new TunedUnit(row, playerOwned, fingerprint);
+    /// <summary>Checks team, occupied party slot and marker without computing a fingerprint.
+    /// Called from the game's stat calculations. Guests have separate slots even on the player's team.</summary>
+    public static bool IsPartyMember(ReadOnlySpan<byte> unit, ReadOnlySpan<byte> roster) =>
+        unit.Length >= BattleBinding.Stride && unit[RosterSlot] < RosterLayout.PartySlots && !MatchedRosterRecord(unit, roster).IsEmpty;
+
+    private static ReadOnlySpan<byte> MatchedRosterRecord(ReadOnlySpan<byte> unit, ReadOnlySpan<byte> roster)
+    {
+        var slot = unit[RosterSlot];
+        if ((unit[Flags] & TeamMask) != 0 || slot >= RosterLayout.Capacity || roster.Length != RosterLayout.TableSize) return [];
+        var record = RosterLayout.Record(roster, slot);
+        return RosterRecord.Holds(record, slot) && SameCharacter(record[RosterLayout.Marker], unit[Marker]) ? record : [];
     }
 
     /// <summary>Ramza's marker changes with the chapter (1 to 3); every other unit keeps its own.</summary>
@@ -385,4 +401,6 @@ public sealed record StatTuningPaths(string Root)
     public string RulesFile => Path.Combine(Root, "rules.json");
     /// <summary>Written by the mod: the game's own job values.</summary>
     public string JobsFile => Path.Combine(Root, "jobs.json");
+    /// <summary>Written by the mod after checking the expanded stat limits for this game session.</summary>
+    public string LimitsReadyFile => Path.Combine(Root, "limits-ready.json");
 }

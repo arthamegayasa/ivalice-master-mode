@@ -2,7 +2,7 @@
   "ModId": "ivalice.party.reincarnation",
   "ModName": "Reincarnation",
   "ModAuthor": "arthamegayasa",
-  "ModVersion": "0.4.0",
+  "ModVersion": "0.7.0",
   "ModDescription": "Lets a party member of level 10 or higher start again at level 1 with permanently better starting stats. Chosen in Ivalice Control Center; refused during battles.",
   "ModDll": "ivalice.party.reincarnation.dll",
   "ModIcon": "Preview.png",

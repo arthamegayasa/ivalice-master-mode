@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text.Json;
 using Ivalice.Party;
 using ivalice.party.stattuning.Configuration;
 using ivalice.party.stattuning.Template;
@@ -65,6 +67,9 @@ public unsafe class Mod : ModBase // <= Do not Remove.
     [Function(CallingConventions.Microsoft)]
     private delegate void UnitCallback(byte* unit);
 
+    [Function(CallingConventions.Microsoft)]
+    private delegate void LimitCallback(LimitRegisters* frame, LimitSite site);
+
     private readonly IReloadedHooks? _hooks;
     private readonly ILogger _logger;
     private volatile Config _configuration;
@@ -81,6 +86,9 @@ public unsafe class Mod : ModBase // <= Do not Remove.
 
     private readonly List<IAsmHook> _unitHooks = [];
     private readonly List<IReverseWrapper<UnitCallback>> _unitCallbacks = [];
+    private readonly List<IReverseWrapper<LimitCallback>> _limitCallbacks = [];
+    private volatile bool _limitsReady;
+    private bool? _publishedLimitsReady;
     private IAsmHook? _selfTestHook;
     private IReverseWrapper<UnitCallback>? _selfTestCallback;
     private volatile bool _selfTesting;
@@ -103,6 +111,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         _hooks = context.Hooks;
         _logger = context.Logger;
         _configuration = context.Configuration;
+        PublishLimitsReady();
 
         if (_hooks is null || !context.ModLoader.GetController<IStartupScanner>().TryGetTarget(out var scanner))
         {
@@ -183,8 +192,11 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             }
             else Log("Could not find all three places where the game sets a unit's Move and Jump: rules for Move and Jump are off, the other rules still work.");
 
+            InstallLimitHooks();
+
             Directory.CreateDirectory(_paths.Root);
             LoadRules();
+            PublishLimitsReady();
             _poll = new Timer(_ => Poll(), null, PollMilliseconds, PollMilliseconds);
 
             var rules = _rules;
@@ -195,6 +207,8 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         }
         catch (Exception e)
         {
+            _limitsReady = false;
+            PublishLimitsReady();
             // Never leave one of the two places hooked without the other.
             foreach (var hook in _unitHooks)
             {
@@ -216,6 +230,90 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         var hook = _hooks.CreateAsmHook(assembly, _gameBase + site, options);
         hook.Activate();
         _unitHooks.Add(hook);
+    }
+
+    private void InstallLimitHooks()
+    {
+        if (_roster == null) { Log("Player stat limits inactive: missing roster."); return; }
+        var installed = new List<IAsmHook>();
+        try
+        {
+            using var file = File.OpenRead(Environment.ProcessPath!);
+            if (!Convert.ToHexString(SHA256.HashData(file)).Equals(StatLimitHooks.GameHash, StringComparison.Ordinal))
+            {
+                Log("Player stat limits inactive: this executable has not been verified.");
+                return;
+            }
+            foreach (var site in StatLimitHooks.Sites)
+            {
+                var expected = Convert.FromHexString(site.ExpectedBytes);
+                if (site.Rva > _gameSize - expected.Length ||
+                    !new ReadOnlySpan<byte>((void*)(_gameBase + site.Rva), expected.Length).SequenceEqual(expected))
+                {
+                    Log($"Player stat limits inactive: {site.Kind} does not match the expected game code.");
+                    return;
+                }
+            }
+            foreach (var site in StatLimitHooks.Sites)
+            {
+                var call = _hooks!.Utilities.GetAbsoluteCallMnemonics<LimitCallback>(OnStatLimit, out var wrapper);
+                _limitCallbacks.Add(wrapper);
+                var hook = _hooks.CreateAsmHook(StatLimitHooks.Stub(site, call), _gameBase + site.Rva,
+                    new AsmHookOptions { Behaviour = AsmHookBehaviour.ExecuteFirst, PreferRelativeJump = true, MaxOpcodeSize = 5, hookLength = site.HookLength });
+                installed.Add(hook);
+                hook.Activate();
+            }
+            _unitHooks.AddRange(installed);
+            _limitsReady = true;
+            Log("Player stat limits ready: base stats, armor, equipped totals and three status views.");
+        }
+        catch (Exception e)
+        {
+            _limitsReady = false;
+            foreach (var hook in installed)
+                try { hook.Disable(); }
+                catch (Exception) { /* Callbacks remain inactive when activation fails. */ }
+            Log($"Player stat limits inactive: {e.Message}");
+        }
+    }
+
+    private void OnStatLimit(LimitRegisters* frame, LimitSite site)
+    {
+        try
+        {
+            if (_limitsReady)
+                StatLimitHooks.Apply(site, ref *frame, _rules.PlayerLimits, new ReadOnlySpan<byte>(_roster, RosterLayout.TableSize));
+        }
+        catch (Exception e)
+        {
+            if (_reportedFailure) return;
+            _reportedFailure = true;
+            try { Log($"Could not apply a player stat limit at {site}: {e.Message}"); }
+            catch (Exception) { /* Keep the exception out of the game's thread. */ }
+        }
+    }
+
+    // The PID and start time let Control Center reject another session's cached readiness.
+    private void PublishLimitsReady()
+    {
+        var ready = _limitsReady;
+        if (_publishedLimitsReady == ready) return;
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            var session = new PlayerLimitSession(process.Id, process.StartTime.ToUniversalTime().Ticks, ready);
+            var status = JsonSerializer.Serialize(session, BridgeJson.Default.PlayerLimitSession);
+            Directory.CreateDirectory(_paths.Root);
+            var path = _paths.LimitsReadyFile;
+            var temporary = path + "." + process.Id + ".tmp";
+            File.WriteAllText(temporary, status);
+            File.Move(temporary, path, overwrite: true);
+            _publishedLimitsReady = ready;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Keep the game running. Poll retries if Control Center had the file open.
+        }
     }
 
     private static string Describe(StatTuningRules rules) =>
@@ -274,7 +372,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
             }
 
             var rules = _rules;
-            if (unit == null || rules.IsEmpty) return;
+            if (unit == null || (rules.Jobs.Count == 0 && rules.Characters.Count == 0)) return;
 
             var record = new ReadOnlySpan<byte>(unit, BattleBinding.Stride);
             var roster = _roster != null ? new ReadOnlySpan<byte>(_roster, RosterLayout.TableSize) : default;
@@ -313,7 +411,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         try
         {
             var rules = _rules;
-            if (_selfTesting || unit == null || rules.IsEmpty) return;
+            if (_selfTesting || unit == null || (rules.Jobs.Count == 0 && rules.Characters.Count == 0)) return;
 
             var record = new ReadOnlySpan<byte>(unit, BattleBinding.Stride);
             var roster = _roster != null ? new ReadOnlySpan<byte>(_roster, RosterLayout.TableSize) : default;
@@ -358,6 +456,7 @@ public unsafe class Mod : ModBase // <= Do not Remove.
         try
         {
             LoadRules();
+            PublishLimitsReady();
             ExportJobs();
         }
         catch (Exception e)
