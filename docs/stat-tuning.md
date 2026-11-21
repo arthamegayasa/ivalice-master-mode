@@ -21,6 +21,16 @@ Raw stats live in the save; growth and multipliers do not. So a growth rule leav
 
 "The player's" means the unit's team bits (battle unit `+0x05`, mask `0x30`) are zero. A character rule also needs the unit's roster slot (`+0x02`) to hold a record with the same character marker; the rule is found by the same fingerprint the Reinkarnasi tab uses (character marker, sex, birthday, name key).
 
+## Player stat limits
+
+In **Stat → Batas stat party**, select which limits to raise. The new ceilings are 9,999 for HP and MP, 99 for Speed, and 255 for PA and MA. Each switch starts off. These limits apply to player units independently of the job-rule setting for enemies.
+
+The character's raw stat and multiplier still determine its calculated value. With the stock 24-bit raw stat and a multiplier of up to 255%, the theoretical maximum before equipment is 2,611. Raising the HP ceiling to 9,999 leaves a character with 400 calculated HP at 400 HP.
+
+Limit edits share the existing draft. **Simpan** writes them to the mod's rules file. **Batalkan perubahan** restores the saved settings. Job presets and job resets keep the chosen limits. The game save continues to hold the character's underlying raw stats.
+
+While the game runs, the card reports whether the native mod confirmed support for these caps in the current session. It matches the game's process ID and start time to the mod's readiness signal. A missing signal, an unsupported game build, or a failed activation leaves support unconfirmed. In that case the Reinkarnasi preview uses stock caps while retaining any ordinary job or character tuning.
+
 ## Move and Jump
 
 Move and Jump are whole numbers of tiles, so they are not tuned by percentage:
@@ -81,6 +91,8 @@ A job entry may also carry `"move"` and `"jump"`, and a character entry `"moveBo
 
 ## Confirmed in play
 
+On Steam Enhanced v1.5.2, a high-stat Ramza on a disposable save showed 999 HP, 999 MP, 50 Speed, 99 PA and 99 MA with stock caps. Enabling only the five caps gave him 1,241 HP (including 13 from equipment), 1,075 MP, 99 Speed, 255 PA and 255 MA in the Units screen and in a Mandalia Plain battle. He advanced from level 5 to 8. After a full game restart, the post-battle autosave showed the same five stats at level 8. In an ordinary save with the same settings, level-5 Ramza still showed 62 HP and 21 MP.
+
 On one Chapter 1 save, with the seven other mods of this project loaded:
 
 - Log: `Self-test passed`, both copy sites hooked, roster and job table found, `jobs.json` written. Squire's own values read `11/100, 15/75, 100/100, 60/90, 50/80`, the known ones.
@@ -102,16 +114,16 @@ Move and Jump (same day, same save): the three sites hooked; in battle Ramza's u
 - "Aturan job berlaku juga untuk musuh" switched on, in the game. The rule logic is covered by tests only.
 - Story battles, guests in battle, and special jobs other than Ramza's.
 - A job change, and a unit changing form, during a battle.
-- Loading a save made after tuned level-ups (the raw stats are ordinary save data, but the round trip was not played).
-- Values at the extremes (growth 1 with a high level, multiplier 255), and the game's own caps (999 HP and MP, 50 Speed, 99 PA and MA).
+- Loading a save made after level-ups with a modified job growth rate. The autosave round trip above used stock growth.
+- Growth 1 at a high level, a job multiplier of 255 in play, and absolute HP or MP of 9,999. The playtest reached 1,241 HP and 1,075 MP. The original raw-stat format constrains what can be reached through growth.
 
 ## Limits to know about
 
 - The values in the tab are the ones before the game's own correction described under "How it works"; where that correction is not zero, the HP and Speed numbers the game ends up using differ from the tab's by that amount.
-- Job `0xA1` and the row it switches to at job level 8 (`0xA4`) have no name in the job list and appear as "Job tanpa nama". The "Hasil di job sekarang" column uses the character's job id, so for that one job it does not follow the switch.
+- Job `0xA1` and the row it switches to at job level 8 (`0xA4`) appear as "Job tanpa nama". Character projections use the effective row reported by the game mod. For an older feed that lacks the row, the Stat tab shows a dash for that job.
 - The game has a second level-up routine that works on a roster record and reads the job table directly (`0x278B24`, called from `0x289F19`). The mod does not cover it. What triggers it was not determined; level-ups earned in battle do not go through it.
 - A battle in progress is not changed by new rules, and neither is a unit that was built before the rules were saved.
-- With Stat Tuning installed and enabled, the Reinkarnasi tab uses the saved job and character rules for current stats and the level-1 preview, before equipment. The feed supplies the raw stats for each separately. A missing catalog or unknown job leaves the feed values intact. Job `0xA1` also keeps the feed values because the feed omits the job level needed to distinguish rows `0xA1` and `0xA4`.
+- With Stat Tuning installed and enabled, the Reinkarnasi tab uses the saved job and character rules for current stats and the level-1 preview, before equipment. The feed supplies the raw stats for each separately. A missing catalog, an unknown job, or a legacy feed with an ambiguous `0xA1` row leaves the feed values intact.
 - Speed, PA and MA are small whole numbers, so a modest multiplier change may not move them.
 - Characters are matched by fingerprint. Two generic units with the same sex, birthday and name key would share a rule.
 - Tuning is not balance-checked: high multipliers make the game trivially easy, and raw stats raised through a faster growth stay in the save after the rule is removed.

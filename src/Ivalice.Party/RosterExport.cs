@@ -31,7 +31,12 @@ public sealed record UnitEntry(
     string Fingerprint,
     bool OnErrand,
     int? BattleSlot,
-    NextReincarnation? Next);
+    NextReincarnation? Next)
+{
+    /// <summary>The job-table row used to calculate stats, which depends on job level for job 0xA1.
+    /// Absent in feeds written before v0.7.0.</summary>
+    public int? EffectiveJobRow { get; init; }
+}
 
 /// <summary>Looks up a unit's display name from its name key; returns null when it cannot.</summary>
 public delegate string? NameResolver(int nameKey);
@@ -73,7 +78,7 @@ public static class RosterExport
             Fingerprint: StampCodec.FingerprintText(record),
             OnErrand: record[RosterLayout.OnErrand] != 0,
             BattleSlot: bound >= 0 ? bound : null,
-            Next: next);
+            Next: next) { EffectiveJobRow = JobTable.RowOf(record) };
     }
 
     /// <summary>One entry per slot that holds a unit, in slot order.</summary>

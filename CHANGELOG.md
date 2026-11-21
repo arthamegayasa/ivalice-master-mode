@@ -2,6 +2,11 @@
 
 All notable changes to this project are recorded here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-11-21
+
+- Add five independent **Batas stat party** switches to Stat Tuning. The available ceilings are HP 9,999, MP 9,999, Speed 99, PA 255 and MA 255. They keep existing raw stats, job multipliers, growth and reincarnation calculations. Existing profiles start with all five switches off.
+- The Reinkarnasi tab uses the selected caps for current and level-1 previews. With the existing 24-bit raw format, even a 255% multiplier gives at most 2,611 HP or MP before equipment.
+
 ## [0.6.1] - 2026-11-21
 
 - The custom Stat preset now restores selected growth or multiplier values to the job defaults at 100%. Quick presets preserve unrelated draft values. The job table labels distinguish the game's original values from the editable draft.
@@ -230,6 +235,7 @@ First release.
 - The install script was only run on a Windows 11 machine where everything was already installed, so its download, build and first-run paths have not been exercised end to end.
 - Global JP Boost and XP Multiplier have not been tested together in a battle.
 
+[0.7.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.7.0
 [0.6.1]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.6.1
 [0.6.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.6.0
 [0.5.0]: https://github.com/arthamegayasa/ivalice-master-mode/releases/tag/v0.5.0

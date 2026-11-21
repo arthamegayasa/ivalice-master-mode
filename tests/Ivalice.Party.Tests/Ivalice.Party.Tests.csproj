@@ -31,6 +31,7 @@
     <Compile Include="..\..\mods\ivalice.party.reincarnation\HookStub.cs" Link="Mod\HookStub.cs" />
     <Compile Include="..\..\mods\ivalice.party.reincarnation\RegisterSelfTest.cs" Link="Mod\RegisterSelfTest.cs" />
     <Compile Include="..\..\mods\ivalice.party.stattuning\HookStub.cs" Link="StatTuningMod\HookStub.cs" />
+    <Compile Include="..\..\mods\ivalice.party.stattuning\StatLimitHooks.cs" Link="StatTuningMod\StatLimitHooks.cs" />
   </ItemGroup>
 
 </Project>

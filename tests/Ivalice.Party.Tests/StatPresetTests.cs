@@ -113,9 +113,12 @@ public class StatPresetTests
     }
 
     [Fact]
-    public void Absent_rules_unknown_jobs_and_job_A1_keep_the_exact_feed()
+    public void A_legacy_feed_without_a_resolved_A1_row_keeps_the_exact_stats()
     {
         var roster = Roster(Fake.Unit(job: 0xA1), Fake.Unit(slot: 2, job: 0x77));
+        var json = System.Text.Json.Nodes.JsonNode.Parse(RosterFeed.Serialize(roster))!;
+        foreach (var unit in json["units"]!.AsArray()) unit!.AsObject().Remove("effectiveJobRow");
+        roster = System.Text.Json.JsonSerializer.Deserialize(json.ToJsonString(), BridgeJson.Default.RosterDocument)!;
         var rules = StatTuningRules.Parse("""{"jobs":[{"job":161,"multiplier":[200]},{"job":119,"multiplier":[200]}]}""")!;
         Assert.Same(roster, TunedRoster.Apply(roster, rules, Jobs.ToDictionary(j => j.Job)));
         var known = Roster(Fake.Unit());
@@ -123,5 +126,22 @@ public class StatPresetTests
         Assert.Same(known, TunedRoster.Apply(known, StatTuningRules.Empty, Jobs.ToDictionary(j => j.Job)));
         Assert.Same(known, TunedRoster.Apply(known, Draft, new Dictionary<int, JobDefaults>()));
         Assert.Same(known, TunedRoster.Apply(known, rules, Jobs.ToDictionary(j => j.Job)));
+    }
+
+    [Theory]
+    [InlineData(7, 511)]
+    [InlineData(8, 1535)]
+    public void The_roster_uses_the_games_actual_job_row_even_for_the_upgrading_job(int jobLevel, int expectedHp)
+    {
+        var unit = Fake.Unit(job: 0xA1);
+        unit[RosterLayout.JobLevels + 10] = (byte)jobLevel;
+        RosterRecord.WriteRawStats(unit, new StatBlock(0xFFFFFF, 0, 0, 0, 0));
+        var roster = Roster(unit);
+        var jobs = new[] { new JobDefaults(0xA1, [13,13,100,80,50], [50,50,100,50,50]),
+            new JobDefaults(0xA4, [6,8,80,40,40], [100,140,120,130,120]) }.ToDictionary(j => j.Job);
+        var rules = StatTuningRules.Parse("""{"playerLimits":{"hp":true},"jobs":[{"job":164,"multiplier":[150]}]}""")!;
+        using var doc = System.Text.Json.JsonDocument.Parse(RosterFeed.Serialize(roster));
+        Assert.Equal(jobLevel == 8 ? 0xA4 : 0xA1, doc.RootElement.GetProperty("units")[0].GetProperty("effectiveJobRow").GetInt32());
+        Assert.Equal(expectedHp, TunedRoster.Apply(roster, rules, jobs, playerLimitsReady: true).Units[0].Shown!.Value.Hp);
     }
 }
